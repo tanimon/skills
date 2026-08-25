@@ -127,5 +127,55 @@ out=$(cd "$WORK/proj2" && EVERGREEN_USER_BUNDLE="$WORK/nonexistent" "$Q" --keywo
 assert_exit "$rc" 0 "bundle なしの query は exit 0"
 assert_not_contains "$out" "pipe-exit-code"
 
+echo "=== wiki-lint (single-file checks) ==="
+L="$SCRIPT_DIR/wiki-lint.sh"
+# 異常系 fixture bundle
+BAD="$WORK/badkb"; make_bundle "$BAD"
+# frontmatter なし
+printf '# no frontmatter\n' > "$BAD/notes/no-fm.md"
+# type 空
+cat > "$BAD/notes/empty-type.md" <<'EOF'
+---
+type:
+title: type が空
+---
+# type が空
+EOF
+# actor 記法違反 + verified が単一マッピング(正準形違反) + 検証失効 + 期限切れ
+cat > "$BAD/notes/bad-actor.md" <<'EOF'
+---
+type: note
+title: 不正 actor
+description: actor 記法と正準形の違反サンプル
+tags: [shell]
+generated:
+  by: just a name
+  at: 2026-08-25T02:00:00Z
+verified:
+  by: human:reviewer
+  at: 2026-08-25T01:00:00Z
+status: stable
+stale_after: 2020-01-01T00:00:00Z
+---
+# 不正 actor
+
+## 関連
+* [パイプは exit code を隠す](/notes/pipe-exit-code.md)
+EOF
+out=$("$L" --bundle "$BAD"); rc=$?
+assert_exit "$rc" 1 "ERROR があれば exit 1"
+assert_contains "$out" "ERROR	conformance-frontmatter"
+assert_contains "$out" "ERROR	conformance-type"
+assert_contains "$out" "ERROR	actor-format"
+assert_contains "$out" "SUGGEST	canonical-form"
+assert_contains "$out" "SUGGEST	stale"
+assert_contains "$out" "SUGGEST	verify-stale"
+# 正常系 bundle では単一ファイル検査の ERROR/SUGGEST が出ない
+out=$("$L" --bundle "$WORK/userkb"); rc=$?
+assert_exit "$rc" 0 "正常系は exit 0"
+assert_not_contains "$out" "conformance-"
+assert_not_contains "$out" "actor-format"
+assert_not_contains "$out" "canonical-form"
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
