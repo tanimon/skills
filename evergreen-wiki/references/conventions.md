@@ -106,6 +106,8 @@ evergreen-wiki 以外のプロデューサーが書いた、正準形ではな�
 
 `type` によらず、すべてのページは共通して次の構造をとる。
 
+(以下は fenced code block ではなく4スペースインデントで記述している。フェンスにすると実例中の `## 関連` が章見出しの機械検証(`grep '^## '`)に誤って含まれるため)
+
     # <title>
 
     <本文。type に応じた内容を記述する>
@@ -170,6 +172,8 @@ okf_version: "0.2"
 - 各行の `<description>` は該当ページの frontmatter `description` と一致させる。
 
 ### log.md
+
+(以下は fenced code block ではなく4スペースインデントで記述している。フェンスにすると実例中の `## YYYY-MM-DD` が章見出しの機械検証(`grep '^## '`)に誤って含まれるため)
 
     # Update Log
 
