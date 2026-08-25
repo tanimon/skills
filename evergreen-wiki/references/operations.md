@@ -13,7 +13,7 @@
 
 3. **見つからない場合のみ、場所を決定する**。
    - user scope: `~/knowledge/` に固定する(環境変数 `EVERGREEN_USER_BUNDLE` で上書きされている場合はその値)。場所の確認は不要。
-   - project scope: `git rev-parse --show-toplevel`(git 管理外の場合は CWD)配下の候補(`docs/knowledge/` 等)を提示し、AskUserQuestion ツールでユーザーに確認して決定する。
+   - project scope: `git rev-parse --show-toplevel`(git 管理外の場合は CWD)配下の候補(`docs/knowledge/` 等)を提示し、AskUserQuestion ツールでユーザーに確認して決定する。`bundle-locate.sh` はプロジェクトルートから深さ4まで(`find -maxdepth 4`)しか探索しないため、これを超える深い場所を候補として選ぶと、以後の Query/Lint/Ingest がこの bundle を発見できなくなる。候補提示時は深さ4以内の場所に限定する。
 4. **scaffold を作成する**。bundle root に以下の3点を作成する。
 
    `index.md`:
@@ -104,6 +104,7 @@
 
    | check id | 検出内容 | 対処方法 |
    |---|---|---|
+   | `conformance-structure` | bundle 直下に予約ファイル(`index.md` または `log.md`)が存在しない | 該当ファイルを conventions.md §7 の正準形式で作成する。存在しない間、その bundle では当該ファイルに依存する横断検査(`index-miss` / `index-format` / `log-format`)がスキップされる |
    | `conformance-frontmatter` | frontmatter が存在しないか、閉じる `---` が無い | conventions.md §3 の正準形で frontmatter を追加する |
    | `conformance-type` | `type` フィールドが欠落または空 | `type` に `note` / `concept` / `entity` 等を設定する |
    | `actor-format` | `generated` / `verified` の `by:` が actor 記法(`^(human:.+\|process:.+\|[^/ ]+/[^/ ]+)$`)に違反 | conventions.md §3 の actor 記法(`human:<id>` / `process:<id>` / `<producer>/<version>`)に沿って書き直す |
@@ -121,7 +122,7 @@
    | `canonical-form` | frontmatter のキー順序が正準順(conventions.md §3)でない、または `verified` が単一マッピングで書かれている(1要素でもリスト形式でない) | conventions.md §3 の正準形に正規化する。外部プロデューサー由来の非正準 YAML はエラーではなく正規化の提案として扱う(conventions.md §3「OKF 許容原則」) |
    | `stale` | `stale_after` の期限を超過している | 内容を見直し、`stale_after` の更新、または `status: deprecated` への変更を検討する(conventions.md §9) |
    | `verify-stale` | 最新の `verified.at` が `generated.at` より古い(検証失効。マージで内容が変わったのに再検証されていない) | 内容を再確認し、`verified` に新しい検証イベントを追記する(既存の `verified` は削除しない) |
-   | `concept-candidate` | 同一タグを5件以上の note が共有しているが、そのタグを持つ `concept` ページが無い | 該当 note 群を束ねる `concept` ページの新設を検討する(conventions.md §5) |
+   | `concept-candidate` | 同一タグを `concept` 以外のページが5件以上共有しているが、そのタグを持つ `concept` ページが無い | 該当ページ群を束ねる `concept` ページの新設を検討する(conventions.md §5) |
 
 2. **LLM 意味チェック**。機械チェックでは検出できない、内容面の矛盾・重複・陳腐化・欠落している `concept` を洗い出す。複数ページを読み比べ、同趣旨なのに別ページになっているもの、矛盾する記述、実質的に古い情報を検出する。
 3. **変更の適用**。加算的な変更(リンクの追加、`index.md` の記載漏れ補完など)は検出次第そのまま実行してよい。破壊的な変更(ページの統合、`status: deprecated` への変更)はまとめてユーザーに提示し、一括で承認を得てから適用する。

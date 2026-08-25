@@ -98,6 +98,9 @@ assert_not_contains "$out" "proj2"
 make_bundle "$WORK/proj3/node_modules/pkg/knowledge"
 out=$(EVERGREEN_USER_BUNDLE="$WORK/nonexistent" "$SCRIPT_DIR/bundle-locate.sh" --root "$WORK/proj3")
 assert_not_contains "$out" "node_modules"
+# --root に存在しないディレクトリを渡しても exit 0(git toplevel も abspath も失敗するケース)
+out=$(EVERGREEN_USER_BUNDLE="$WORK/nonexistent" "$SCRIPT_DIR/bundle-locate.sh" --root "$WORK/no-such-dir"); rc=$?
+assert_exit "$rc" 0 "存在しない --root でも exit 0"
 
 echo "=== wiki-query ==="
 Q="$SCRIPT_DIR/wiki-query.sh"
@@ -265,6 +268,11 @@ out=$("$L" --bundle "$IF"); rc=$?
 assert_exit "$rc" 1 "index-format/log-format で exit 1"
 assert_contains "$out" "ERROR	index-format"
 assert_contains "$out" "ERROR	log-format"
+# conformance-structure: index.md も log.md も無い bundle は ERROR + exit 1(偽陰性の回帰防止)
+NOFILE="$WORK/nofilekb"; mkdir -p "$NOFILE/notes"
+out=$("$L" --bundle "$NOFILE"); rc=$?
+assert_exit "$rc" 1 "予約ファイル不存在で exit 1"
+assert_contains "$out" "ERROR	conformance-structure"
 
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

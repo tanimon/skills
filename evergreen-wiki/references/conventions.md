@@ -133,7 +133,7 @@ evergreen-wiki 以外のプロデューサーが書いた、正準形ではな�
 
 - kebab-case で記述する。
 - 分類は階層ディレクトリではなく tags と相互リンクによって表現する。これは Evergreen notes の設計原則(atomic・concept-oriented・densely linked であり、階層分類を持たない)に従うものである。
-- 複数の `note` が同じ tag を持つクラスタは、`concept` ページへ昇華させる候補として Lint が検出する(operations.md 参照)。
+- `concept` 以外のページ(`note` / `entity` 等)が同じ tag を5件以上共有するクラスタは、`concept` ページへ昇華させる候補として Lint が検出する(operations.md 参照)。
 
 ## 6. リンク記法
 

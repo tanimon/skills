@@ -84,6 +84,11 @@ check_note_file() { # bundle file
 
 check_bundle_cross() { # bundle
   local b="$1" f slug to t
+  # 予約ファイル構造検査: index.md / log.md が無ければ ERROR を出し、
+  # 以降の当該ファイルに依存する横断検査(index-miss/index-format/log-format)はスキップする
+  local has_index=1 has_log=1
+  [ -f "$b/index.md" ] || { report ERROR conformance-structure "$b" "index.md" "予約ファイルが存在しない"; has_index=0; }
+  [ -f "$b/log.md" ]   || { report ERROR conformance-structure "$b" "log.md" "予約ファイルが存在しない"; has_log=0; }
   local links_file; links_file=$(mktemp)
   # links_file: "from>to" の行集合(存在しないリンク先も含む。broken-link 判定と併用)
   for f in "$b"/notes/*.md; do
@@ -94,7 +99,9 @@ check_bundle_cross() { # bundle
       printf '%s>%s\n' "$slug" "$to" >> "$links_file"
       [ -f "$b/notes/$to.md" ] || report ERROR broken-link "$b" "notes/$slug.md" "リンク先が存在しない: /notes/${to}.md"
     done
-    grep -qF "(/notes/$slug.md)" "$b/index.md" || report ERROR index-miss "$b" "notes/$slug.md" "index.md に未記載"
+    if [ "$has_index" = 1 ]; then
+      grep -qF "(/notes/$slug.md)" "$b/index.md" || report ERROR index-miss "$b" "notes/$slug.md" "index.md に未記載"
+    fi
   done
   # one-way-link / orphan(存在するページ間のみ対象。slug は [a-z0-9-] のみなので正規表現エスケープ不要)
   for f in "$b"/notes/*.md; do
@@ -113,27 +120,31 @@ check_bundle_cross() { # bundle
     fi
   done
   rm -f "$links_file"
-  # index-format: frontmatter は okf_version のみ / エントリ行の書式
-  # pipefail 下で「パイプ全体の終了ステータス」を条件に使うと、上流 grep が SIGPIPE で
-  # 非0終了した場合に grep -q . が成功していても && が発火しないことがある(データ依存の不具合)。
-  # そのため必ずコマンド置換で結果を変数へ捕捉してから空文字判定する。
-  local bad_fm bad_entry
-  bad_fm=$(fm_block "$b/index.md" | grep -Ev '^okf_version:')
-  [ -n "$bad_fm" ] &&
-    report ERROR index-format "$b" "index.md" "frontmatter に okf_version 以外のキーがある"
-  bad_entry=$(grep -E '^\* ' "$b/index.md" | grep -Ev '^\* \[[^]]+\]\(/notes/[a-z0-9-]+\.md\) - .+')
-  [ -n "$bad_entry" ] &&
-    report ERROR index-format "$b" "index.md" "エントリ行が「* [title](/notes/slug.md) - description」形式でない"
-  # log-format: 日付見出しの形式と降順(同様にコマンド置換で捕捉してから判定)
-  local bad_date
-  bad_date=$(grep -E '^## ' "$b/log.md" | grep -Ev '^## [0-9]{4}-[0-9]{2}-[0-9]{2}$')
-  [ -n "$bad_date" ] &&
-    report ERROR log-format "$b" "log.md" "日付見出しが ## YYYY-MM-DD 形式でない"
-  local dates sorted
-  dates=$(grep -E '^## [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$b/log.md" | sed 's/^## //')
-  sorted=$(echo "$dates" | sort -r)
-  [ "$dates" = "$sorted" ] ||
-    report ERROR log-format "$b" "log.md" "日付見出しが新しい順(降順)でない"
+  if [ "$has_index" = 1 ]; then
+    # index-format: frontmatter は okf_version のみ / エントリ行の書式
+    # pipefail 下で「パイプ全体の終了ステータス」を条件に使うと、上流 grep が SIGPIPE で
+    # 非0終了した場合に grep -q . が成功していても && が発火しないことがある(データ依存の不具合)。
+    # そのため必ずコマンド置換で結果を変数へ捕捉してから空文字判定する。
+    local bad_fm bad_entry
+    bad_fm=$(fm_block "$b/index.md" | grep -Ev '^okf_version:')
+    [ -n "$bad_fm" ] &&
+      report ERROR index-format "$b" "index.md" "frontmatter に okf_version 以外のキーがある"
+    bad_entry=$(grep -E '^\* ' "$b/index.md" | grep -Ev '^\* \[[^]]+\]\(/notes/[a-z0-9-]+\.md\) - .+')
+    [ -n "$bad_entry" ] &&
+      report ERROR index-format "$b" "index.md" "エントリ行が「* [title](/notes/slug.md) - description」形式でない"
+  fi
+  if [ "$has_log" = 1 ]; then
+    # log-format: 日付見出しの形式と降順(同様にコマンド置換で捕捉してから判定)
+    local bad_date
+    bad_date=$(grep -E '^## ' "$b/log.md" | grep -Ev '^## [0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    [ -n "$bad_date" ] &&
+      report ERROR log-format "$b" "log.md" "日付見出しが ## YYYY-MM-DD 形式でない"
+    local dates sorted
+    dates=$(grep -E '^## [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$b/log.md" | sed 's/^## //')
+    sorted=$(echo "$dates" | sort -r)
+    [ "$dates" = "$sorted" ] ||
+      report ERROR log-format "$b" "log.md" "日付見出しが新しい順(降順)でない"
+  fi
   # concept-candidate: 同一タグ5件以上を非 concept ページが共有 + そのタグを持つ concept ページがない
   local tag has_concept
   for tag in $(for f in "$b"/notes/*.md; do

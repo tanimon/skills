@@ -22,7 +22,7 @@ emit_user() {
 }
 emit_project() {
   local top
-  top=$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || abspath "$ROOT")
+  top=$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || abspath "$ROOT" || true)
   [ -n "$top" ] || return 0
   local user_abs; user_abs=$(abspath "$USER_BUNDLE" || true)
   find "$top" -maxdepth 4 \

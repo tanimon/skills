@@ -76,7 +76,7 @@ scope(user / project)を確認する。
 
 ### Lint(健全化)
 
-`wiki-lint.sh` で機械チェックを行う(正準形一致の検証 → 正準形を前提とした意味チェックの二段構え。ERROR 9種 + SUGGEST 4種)。
+`wiki-lint.sh` で機械チェックを行う(正準形一致の検証 → 正準形を前提とした意味チェックの二段構え。ERROR 10種 + SUGGEST 4種)。
 機械チェックでは検出できない矛盾・重複・陳腐化・欠落 concept を LLM が意味チェックする。
 加算的な変更(リンク追加・index 補完等)は即実行し、破壊的な変更(ページ統合・deprecated 化)は一括でユーザー承認を得てから適用する。
 適用した変更は `log.md` に記録する。
@@ -98,4 +98,4 @@ check id 一覧と詳細手順は `references/operations.md` §4 を参照。
 ## 参照ファイル
 
 - `references/conventions.md` — 書式規約: frontmatter スキーマ・正準シリアライズ形式・type 体系・slug/tag 命名・リンク記法・index.md/log.md 書式・マージ判定基準・Trust/Lifecycle 運用。**ページを作る/更新する前に必ず読む。**
-- `references/operations.md` — Init / Ingest / Query / Lint の実行手順の詳細と、`wiki-lint.sh` の check id(ERROR 9種 + SUGGEST 4種)一覧。
+- `references/operations.md` — Init / Ingest / Query / Lint の実行手順の詳細と、`wiki-lint.sh` の check id(ERROR 10種 + SUGGEST 4種)一覧。
