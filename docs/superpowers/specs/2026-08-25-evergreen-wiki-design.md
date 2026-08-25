@@ -47,7 +47,8 @@ raw source の実体を bundle 内に保存する設計(`sources/` ディレク�
 | user | `~/knowledge/`(固定) | 固定パス |
 | project | Init 時にユーザーへ確認して決定(候補として `docs/knowledge/` を提示) | プロジェクトルート配下から `okf_version` frontmatter を持つ `index.md` を glob 検索 |
 
-レジストリ・設定ファイルは持たない。bundle 自身(`okf_version` を持つ `index.md`)がマーカーとなるため、発見は決定論的でどの環境でも再現する。
+- **プロジェクトルートの定義**: `git rev-parse --show-toplevel`(git 管理外の場合は CWD)。モノレポでは git リポジトリ単位で1 bundle とする(パッケージごとの bundle 分割は採らない)
+- レジストリ・設定ファイルは持たない。bundle 自身(`okf_version` を持つ `index.md`)がマーカーとなるため、発見は決定論的でどの環境でも再現する
 
 ### scope 間の振る舞い
 
@@ -77,6 +78,15 @@ status: stable                    # Lifecycle 族: draft|stable|deprecated(省�
 stale_after: 2027-08-25T00:00:00Z # Lifecycle 族: 時限性のある知識のみに付与
 ---
 ```
+
+### 正準シリアライズ形式(canonical form)
+
+`conventions.md` は frontmatter の意味論だけでなく**シリアライズ形式そのものを規範化する**: キーの順序固定、2スペースインデント固定、`sources`/`verified` は要素1件でも必ずリスト形式、`- resource:`/`- by:` は1行1キー。理由は2つ:
+
+1. この skill が唯一のプロデューサーである限り、常に正準形で書き出せる
+2. lint を bash + 標準ツールで実装するため。grep/awk は YAML を解析できず、既知の正準形への行アンカーのパターンマッチしかできない。正準形の規範化により「(a) 正準形に一致するかの検証 → (b) 正準形を前提とした意味チェック」の二段構えが成立する
+
+外部プロデューサーが書いた正準形でない(しかし OKF 的には妥当な)YAML — 例: 単一マッピングの `verified`(OKF はコンシューマーに1要素リスト扱いを要求)— は、**エラーではなく「正準形違反(提案枠)」として正規化を提案する**。OKF の「コンシューマーは理解できないものを許容する」原則に従い、lint が外部 bundle を誤って拒絶しないようにする。
 
 ### Trust / Lifecycle の運用規約
 
@@ -110,10 +120,11 @@ bundle-relative の絶対形式 `[label](/notes/<slug>.md)` を使う(OKF 推奨
 
 ### Init(bundle 作成)
 
-1. scope を確認(user / project)。user は `~/knowledge/` 固定、project は候補(`docs/knowledge/` 等)を提示しつつユーザーに場所を確認する
-2. 既存 bundle があれば作成せず報告する(`okf_version` frontmatter を持つ `index.md` の存在で判定)
-3. scaffold: `index.md`(`okf_version: "0.2"` + 空のセクション構造)、`log.md`(初期エントリ)、`notes/`
-4. git 管理を推奨として案内する(user bundle は独立リポジトリ化を提案。強制はしない)
+1. scope を確認(user / project)
+2. **先に既存 bundle の発見を実行する**(`bundle-locate.sh`)。既存 bundle があれば作成せず報告して終了する(場所を先に聞くと、別の場所に既存 bundle があった場合に二重 bundle ができ、Query が両方を対等に読んでしまう)
+3. 見つからない場合のみ場所を決める。user は `~/knowledge/` 固定、project は候補(`docs/knowledge/` 等)を提示しつつユーザーに確認する
+4. scaffold: `index.md`(`okf_version: "0.2"` + 空のセクション構造)、`log.md`(初期エントリ)、`notes/`
+5. git 管理を推奨として案内する(user bundle は独立リポジトリ化を提案。強制はしない)
 
 ### Ingest(取り込み)
 
@@ -135,9 +146,9 @@ bundle-relative の絶対形式 `[label](/notes/<slug>.md)` を使う(OKF 推奨
 
 対象 bundle を指定して実行する(または全 bundle を順に):
 
-1. **機械チェック**(`wiki-lint.sh`):
+1. **機械チェック**(`wiki-lint.sh`)。まず正準形(§4)への一致を検証し、正準形を前提に意味チェックを行う:
    - エラー(機械的事実): OKF conformance 違反(frontmatter パース不可・`type` 空・予約ファイル構造違反)/ リンク切れ / 孤立ページ / 片方向リンク / index 記載漏れ / actor 記法違反
-   - 提案(判断材料): `stale_after` 期限超過 / 検証失効(`verified` の最新 `at` < `generated.at`)/ concept 候補(タグクラスタ)
+   - 提案(判断材料): 正準形違反(外部プロデューサー由来等。正規化を提案)/ `stale_after` 期限超過 / 検証失効(`verified` の最新 `at` < `generated.at`)/ concept 候補(タグクラスタ)
 2. **LLM 意味チェック**: 矛盾・重複・陳腐化・欠落 concept の検出と統合
 3. **変更の適用**: 加算的変更(リンク追加・index 補完)は即実行、破壊的変更(ページ統合・deprecated 化)は一括でユーザー承認を得る
 4. log.md に記録する
