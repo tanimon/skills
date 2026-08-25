@@ -99,5 +99,29 @@ make_bundle "$WORK/proj3/node_modules/pkg/knowledge"
 out=$(EVERGREEN_USER_BUNDLE="$WORK/nonexistent" "$SCRIPT_DIR/bundle-locate.sh" --root "$WORK/proj3")
 assert_not_contains "$out" "node_modules"
 
+echo "=== wiki-query ==="
+Q="$SCRIPT_DIR/wiki-query.sh"
+B="$WORK/userkb"
+# --type で絞り込み
+out=$("$Q" --bundle "$B" --type note)
+assert_contains "$out" "pipe-exit-code"
+assert_contains "$out" "pipefail-usage"
+# --tag で絞り込み(error-handling を持つのは1件)
+out=$("$Q" --bundle "$B" --tag error-handling)
+assert_contains "$out" "pipe-exit-code"
+assert_not_contains "$out" "pipefail-usage"
+# --slug 完全一致
+out=$("$Q" --bundle "$B" --slug pipefail-usage)
+assert_contains "$out" "pipefail-usage	note	stable	パイプ中間の失敗を検出する"
+assert_not_contains "$out" "pipe-exit-code"
+# --keyword は本文も対象
+out=$("$Q" --bundle "$B" --keyword "pipefail")
+assert_contains "$out" "pipefail-usage"
+# 複数 bundle 横断(--bundle 2回指定)
+make_bundle "$WORK/kb2"
+out=$("$Q" --bundle "$B" --bundle "$WORK/kb2" --tag shell)
+assert_contains "$out" "$B	pipe-exit-code"
+assert_contains "$out" "$WORK/kb2	pipe-exit-code"
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
