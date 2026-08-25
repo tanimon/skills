@@ -122,6 +122,10 @@ make_bundle "$WORK/kb2"
 out=$("$Q" --bundle "$B" --bundle "$WORK/kb2" --tag shell)
 assert_contains "$out" "$B	pipe-exit-code"
 assert_contains "$out" "$WORK/kb2	pipe-exit-code"
+# bundle が1件もない場合も exit 0(空出力)
+out=$(cd "$WORK/proj2" && EVERGREEN_USER_BUNDLE="$WORK/nonexistent" "$Q" --keyword anything); rc=$?
+assert_exit "$rc" 0 "bundle なしの query は exit 0"
+assert_not_contains "$out" "pipe-exit-code"
 
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -16,6 +16,7 @@ esac; done
 if [ ${#BUNDLES[@]} -eq 0 ]; then
   while IFS=$'\t' read -r _ path; do BUNDLES+=("$path"); done < <("$SCRIPT_DIR/bundle-locate.sh")
 fi
+if [ ${#BUNDLES[@]} -eq 0 ]; then exit 0; fi
 for b in "${BUNDLES[@]}"; do
   for f in "$b"/notes/*.md; do
     [ -e "$f" ] || continue
