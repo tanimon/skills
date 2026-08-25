@@ -245,6 +245,26 @@ assert_contains "$out" "hot-topic"
 out=$("$L" --bundle "$XB" --json 2>/dev/null) || true
 assert_contains "$out" '"severity":"ERROR"'
 assert_contains "$out" '"check":"broken-link"'
+# index-format / log-format: frontmatter に余分なキー・エントリ行崩れ・日付見出しの形式違反
+IF="$WORK/ifkb"; make_bundle "$IF"
+cat > "$IF/index.md" <<'EOF'
+---
+okf_version: "0.2"
+title: bad
+---
+# Notes
+* [壊れた行](/notes/pipe-exit-code.md)
+EOF
+cat > "$IF/log.md" <<'EOF'
+# Update Log
+
+## 2026/08/25
+* 形式違反
+EOF
+out=$("$L" --bundle "$IF"); rc=$?
+assert_exit "$rc" 1 "index-format/log-format で exit 1"
+assert_contains "$out" "ERROR	index-format"
+assert_contains "$out" "ERROR	log-format"
 
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

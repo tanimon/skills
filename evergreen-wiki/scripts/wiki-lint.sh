@@ -89,6 +89,7 @@ check_bundle_cross() { # bundle
   for f in "$b"/notes/*.md; do
     [ -e "$f" ] || continue
     slug=$(basename "$f" .md)
+    # shellcheck disable=SC2013 # 行ではなく個々のリンク先(単語)を反復する意図的な word-split。slug は [a-z0-9-] のみで空白を含まない
     for to in $(grep -o '](/notes/[a-z0-9-]*\.md)' "$f" | sed 's|](/notes/||; s|\.md)||'); do
       printf '%s>%s\n' "$slug" "$to" >> "$links_file"
       [ -f "$b/notes/$to.md" ] || report ERROR broken-link "$b" "notes/$slug.md" "リンク先が存在しない: /notes/${to}.md"
@@ -113,12 +114,20 @@ check_bundle_cross() { # bundle
   done
   rm -f "$links_file"
   # index-format: frontmatter は okf_version のみ / エントリ行の書式
-  fm_block "$b/index.md" | grep -Ev '^okf_version:' | grep -q . &&
+  # pipefail 下で「パイプ全体の終了ステータス」を条件に使うと、上流 grep が SIGPIPE で
+  # 非0終了した場合に grep -q . が成功していても && が発火しないことがある(データ依存の不具合)。
+  # そのため必ずコマンド置換で結果を変数へ捕捉してから空文字判定する。
+  local bad_fm bad_entry
+  bad_fm=$(fm_block "$b/index.md" | grep -Ev '^okf_version:')
+  [ -n "$bad_fm" ] &&
     report ERROR index-format "$b" "index.md" "frontmatter に okf_version 以外のキーがある"
-  grep -E '^\* ' "$b/index.md" | grep -Ev '^\* \[[^]]+\]\(/notes/[a-z0-9-]+\.md\) - .+' | head -n1 | grep -q . &&
+  bad_entry=$(grep -E '^\* ' "$b/index.md" | grep -Ev '^\* \[[^]]+\]\(/notes/[a-z0-9-]+\.md\) - .+')
+  [ -n "$bad_entry" ] &&
     report ERROR index-format "$b" "index.md" "エントリ行が「* [title](/notes/slug.md) - description」形式でない"
-  # log-format: 日付見出しの形式と降順
-  grep -E '^## ' "$b/log.md" | grep -Ev '^## [0-9]{4}-[0-9]{2}-[0-9]{2}$' | head -n1 | grep -q . &&
+  # log-format: 日付見出しの形式と降順(同様にコマンド置換で捕捉してから判定)
+  local bad_date
+  bad_date=$(grep -E '^## ' "$b/log.md" | grep -Ev '^## [0-9]{4}-[0-9]{2}-[0-9]{2}$')
+  [ -n "$bad_date" ] &&
     report ERROR log-format "$b" "log.md" "日付見出しが ## YYYY-MM-DD 形式でない"
   local dates sorted
   dates=$(grep -E '^## [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$b/log.md" | sed 's/^## //')
