@@ -52,19 +52,35 @@ description: >-
 
 ### Init(bundle 作成)
 
-scope を確認 → `bundle-locate.sh --scope all` で既存 bundle の発見を**先に**行う(見つかれば新規作成せず報告して終了) → 見つからない場合のみ場所を決定(user は固定、project はユーザー確認) → `index.md` / `log.md` / `notes/` を scaffold → git 管理を推奨として案内する。詳細手順は `references/operations.md` §1 を参照。
+scope(user / project)を確認する。
+`bundle-locate.sh --scope all` で既存 bundle の発見を**先に**行い、見つかればそのパスを報告して終了する。
+見つからない場合のみ場所を決定する(user は `~/knowledge/` 固定、project はユーザーに確認)。
+`index.md` / `log.md` / `notes/` を scaffold し、git 管理を推奨として案内する。
+詳細手順は `references/operations.md` §1 を参照。
 
 ### Ingest(取り込み・マージ)
 
-一般化できるか・非自明か・繰り返しうるかで候補を選別 → scope 振分(プロジェクト固有→project bundle、汎用→user bundle) → `wiki-query.sh` で既存ページと照合し、同趣旨があればマージ・なければ正準形式で新規作成 → 双方向相互リンク → `index.md` / `log.md` を更新 → 書き込み完了後に報告(同一 bundle への並列書き込みは禁止)。マージ判定基準・正準形式は `references/conventions.md` §3・§8、詳細手順は `references/operations.md` §2 を参照。
+一般化できるか・非自明か・繰り返しうるかで取り込み候補を選別する。
+プロジェクト固有の知識は project bundle、汎用的な教訓は user bundle へ振り分ける。
+`wiki-query.sh` で既存ページと照合し、同趣旨があればマージ、なければ正準形式で新規作成して双方向相互リンクを張る。
+`index.md` / `log.md` を更新し、書き込み完了後に報告する(同一 bundle への並列書き込みは禁止)。
+マージ判定基準・正準形式は `references/conventions.md` §3・§8、詳細手順は `references/operations.md` §2 を参照。
 
 ### Query(参照)
 
-`bundle-locate.sh --scope all` で全 bundle を発見・横断 → `wiki-query.sh` で該当ページを機械的に絞り込み、`## 関連` をたどって関連知識を辿る → どの bundle のどのページを根拠にしたか出典を明示して回答(`deprecated`/`stale_after` 超過ページ使用時はその旨明示) → 複数ページを突き合わせて生まれた新しい統合・洞察は Ingest 手順へ渡して bundle へ還元する(単なる列挙は還元しない)。詳細手順は `references/operations.md` §3 を参照。
+`bundle-locate.sh --scope all` で存在する全 bundle(user + project)を発見し横断する。
+`wiki-query.sh` で該当ページを機械的に絞り込み、`## 関連` をたどって関連知識を辿る。
+どの bundle のどのページを根拠にしたか出典を明示して回答する(`deprecated` / `stale_after` 超過ページ使用時はその旨も明示)。
+複数ページを突き合わせて生まれた新しい統合・洞察は Ingest 手順へ渡して bundle へ還元する(一過性の列挙は還元しない)。
+詳細手順は `references/operations.md` §3 を参照。
 
 ### Lint(健全化)
 
-`wiki-lint.sh` で機械チェック(正準形一致 → 意味チェックの二段構え。ERROR 9種 + SUGGEST 4種。check id 一覧は `references/operations.md` §4)→ LLM による矛盾・重複・陳腐化・欠落 concept の意味チェック → 加算的変更は即実行、破壊的変更(統合・deprecated 化)は一括でユーザー承認を得てから適用 → `log.md` に記録。詳細手順は `references/operations.md` §4 を参照。
+`wiki-lint.sh` で機械チェックを行う(正準形一致の検証 → 正準形を前提とした意味チェックの二段構え。ERROR 9種 + SUGGEST 4種)。
+機械チェックでは検出できない矛盾・重複・陳腐化・欠落 concept を LLM が意味チェックする。
+加算的な変更(リンク追加・index 補完等)は即実行し、破壊的な変更(ページ統合・deprecated 化)は一括でユーザー承認を得てから適用する。
+適用した変更は `log.md` に記録する。
+check id 一覧と詳細手順は `references/operations.md` §4 を参照。
 
 ## スクリプト
 
