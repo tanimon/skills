@@ -177,5 +177,74 @@ assert_not_contains "$out" "conformance-"
 assert_not_contains "$out" "actor-format"
 assert_not_contains "$out" "canonical-form"
 
+echo "=== wiki-lint (cross-file checks) ==="
+XB="$WORK/xkb"; make_bundle "$XB"
+# broken-link + orphan + index-miss: 存在しないページへリンクし、誰からもリンクされず、index 未記載
+cat > "$XB/notes/orphan-note.md" <<'EOF'
+---
+type: note
+title: 孤立ノート
+description: 誰からもリンクされない
+tags: [misc]
+generated:
+  by: claude-code/claude-fable-5
+  at: 2026-08-25T00:00:00Z
+---
+# 孤立ノート
+
+## 関連
+* [存在しないページ](/notes/no-such-page.md)
+* [パイプは exit code を隠す](/notes/pipe-exit-code.md)
+EOF
+# log.md を不正な形式に(日付見出しが昇順)
+cat > "$XB/log.md" <<'EOF'
+# Update Log
+
+## 2026-08-24
+* 古いエントリ
+
+## 2026-08-25
+* 新しいエントリ
+EOF
+out=$("$L" --bundle "$XB"); rc=$?
+assert_exit "$rc" 1 "横断検査の ERROR で exit 1"
+assert_contains "$out" "ERROR	broken-link"
+assert_contains "$out" "ERROR	orphan	$XB	notes/orphan-note.md"
+assert_contains "$out" "ERROR	index-miss"
+assert_contains "$out" "ERROR	log-format"
+# orphan-note → pipe-exit-code は片方向(pipe-exit-code 側に逆リンクなし)
+assert_contains "$out" "ERROR	one-way-link"
+# 正常系 bundle は横断検査も無違反
+out=$("$L" --bundle "$WORK/userkb"); rc=$?
+assert_exit "$rc" 0 "正常系は exit 0"
+assert_not_contains "$out" "broken-link"
+assert_not_contains "$out" "orphan"
+assert_not_contains "$out" "one-way-link"
+# concept-candidate: 同一タグ5件・concept なし
+CC="$WORK/cckb"; make_bundle "$CC"
+for i in 1 2 3 4 5; do
+cat > "$CC/notes/tagged-$i.md" <<EOF
+---
+type: note
+title: tagged $i
+description: 同一タグのサンプル $i
+tags: [hot-topic]
+generated:
+  by: claude-code/claude-fable-5
+  at: 2026-08-25T00:00:00Z
+---
+# tagged $i
+
+## 関連
+EOF
+done
+out=$("$L" --bundle "$CC" 2>/dev/null) || true
+assert_contains "$out" "SUGGEST	concept-candidate"
+assert_contains "$out" "hot-topic"
+# --json は JSONL を出す
+out=$("$L" --bundle "$XB" --json 2>/dev/null) || true
+assert_contains "$out" '"severity":"ERROR"'
+assert_contains "$out" '"check":"broken-link"'
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

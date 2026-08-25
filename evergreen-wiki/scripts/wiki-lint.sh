@@ -82,11 +82,72 @@ check_note_file() { # bundle file
   fi
 }
 
+check_bundle_cross() { # bundle
+  local b="$1" f slug to t
+  local links_file; links_file=$(mktemp)
+  # links_file: "from>to" の行集合(存在しないリンク先も含む。broken-link 判定と併用)
+  for f in "$b"/notes/*.md; do
+    [ -e "$f" ] || continue
+    slug=$(basename "$f" .md)
+    for to in $(grep -o '](/notes/[a-z0-9-]*\.md)' "$f" | sed 's|](/notes/||; s|\.md)||'); do
+      printf '%s>%s\n' "$slug" "$to" >> "$links_file"
+      [ -f "$b/notes/$to.md" ] || report ERROR broken-link "$b" "notes/$slug.md" "リンク先が存在しない: /notes/${to}.md"
+    done
+    grep -qF "(/notes/$slug.md)" "$b/index.md" || report ERROR index-miss "$b" "notes/$slug.md" "index.md に未記載"
+  done
+  # one-way-link / orphan(存在するページ間のみ対象。slug は [a-z0-9-] のみなので正規表現エスケープ不要)
+  for f in "$b"/notes/*.md; do
+    [ -e "$f" ] || continue
+    slug=$(basename "$f" .md)
+    while read -r to; do
+      [ -n "$to" ] || continue
+      [ -f "$b/notes/$to.md" ] || continue
+      grep -qx "$to>$slug" "$links_file" ||
+        report ERROR one-way-link "$b" "notes/$slug.md" "→ ${to} への片方向リンク(${to} 側に逆リンクなし)"
+    done < <(grep "^$slug>" "$links_file" 2>/dev/null | sed "s/^$slug>//")
+    t=$(fm_get "$f" type)
+    if [ "$t" = "note" ]; then
+      grep -q ">$slug\$" "$links_file" ||
+        report ERROR orphan "$b" "notes/$slug.md" "他の note からの被リンクなし"
+    fi
+  done
+  rm -f "$links_file"
+  # index-format: frontmatter は okf_version のみ / エントリ行の書式
+  fm_block "$b/index.md" | grep -Ev '^okf_version:' | grep -q . &&
+    report ERROR index-format "$b" "index.md" "frontmatter に okf_version 以外のキーがある"
+  grep -E '^\* ' "$b/index.md" | grep -Ev '^\* \[[^]]+\]\(/notes/[a-z0-9-]+\.md\) - .+' | head -n1 | grep -q . &&
+    report ERROR index-format "$b" "index.md" "エントリ行が「* [title](/notes/slug.md) - description」形式でない"
+  # log-format: 日付見出しの形式と降順
+  grep -E '^## ' "$b/log.md" | grep -Ev '^## [0-9]{4}-[0-9]{2}-[0-9]{2}$' | head -n1 | grep -q . &&
+    report ERROR log-format "$b" "log.md" "日付見出しが ## YYYY-MM-DD 形式でない"
+  local dates sorted
+  dates=$(grep -E '^## [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$b/log.md" | sed 's/^## //')
+  sorted=$(echo "$dates" | sort -r)
+  [ "$dates" = "$sorted" ] ||
+    report ERROR log-format "$b" "log.md" "日付見出しが新しい順(降順)でない"
+  # concept-candidate: 同一タグ5件以上を非 concept ページが共有 + そのタグを持つ concept ページがない
+  local tag has_concept
+  for tag in $(for f in "$b"/notes/*.md; do
+      [ -e "$f" ] || continue
+      [ "$(fm_get "$f" type)" = "concept" ] && continue
+      fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//'
+    done | grep -v '^$' | sort | uniq -c | awk '$1>=5{print $2}'); do
+    has_concept=0
+    for f in "$b"/notes/*.md; do
+      [ -e "$f" ] || continue
+      [ "$(fm_get "$f" type)" = "concept" ] || continue
+      fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -qx "$tag" && { has_concept=1; break; }
+    done
+    [ "$has_concept" = 0 ] && report SUGGEST concept-candidate "$b" "-" "タグ ${tag} を5件以上が共有(concept ページ候補)"
+  done
+}
+
 for b in "${BUNDLES[@]}"; do
   for f in "$b"/notes/*.md; do
     [ -e "$f" ] || continue
     check_note_file "$b" "$f"
   done
+  check_bundle_cross "$b"
 done
 [ "$ERRORS" -gt 0 ] && exit 1
 exit 0
