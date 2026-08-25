@@ -2,6 +2,8 @@
 
 本書は evergreen-wiki skill が提供する4操作(Init / Ingest / Query / Lint)の実行手順を定める。書式・分類・マージ・相互リンクの規約は `references/conventions.md` を参照し、本書では重複して記載しない。
 
+以下のコマンド例における `scripts/*.sh` は、この skill のディレクトリ(`evergreen-wiki/`)からの相対パスで示す。実行時のカレントディレクトリはユーザーのプロジェクトであり skill ディレクトリとは限らないため、実際に実行する際は skill の絶対パス(例: `~/.claude/skills/evergreen-wiki/scripts/bundle-locate.sh`)に読み替える。
+
 ## 1. Init(bundle 作成)
 
 1. **scope を確認する**。user scope(個人の汎用知識)か project scope(現在のプロジェクト固有知識)かを、依頼内容や文脈から判断する。判断できない場合は AskUserQuestion ツールでユーザーに確認する。
@@ -108,7 +110,7 @@
    | `broken-link` | 本文中の `[label](/notes/<slug>.md)` のリンク先が bundle 内に存在しない | リンク先ページを作成するか、リンクを削除・修正する |
    | `index-miss` | `notes/` 配下のページが `index.md` に記載されていない | `index.md` の該当 type セクションへ1行追加する |
    | `one-way-link` | A→B のリンクがあるのに B→A のリンクが無い(片方向リンク) | B 側のページに A への逆リンクを追加し双方向にする |
-   | `orphan` | `type: note` のページが他のどの note からもリンクされていない(孤立ページ) | 関連する既存ページからリンクするか、`## 関連` に関連ページを追加する |
+   | `orphan` | `type: note` のページが他のどのページからもリンクされていない(孤立ページ) | 関連する既存ページからリンクするか、`## 関連` に関連ページを追加する |
    | `index-format` | `index.md` の frontmatter に `okf_version` 以外のキーがある、またはエントリ行が `* [title](/notes/slug.md) - description` 形式でない | conventions.md §7 の正準形式に修正する |
    | `log-format` | `log.md` の日付見出しが `## YYYY-MM-DD` 形式でない、または新しい日付が上に来る降順で並んでいない | conventions.md §7 の正準形式に修正する |
 
