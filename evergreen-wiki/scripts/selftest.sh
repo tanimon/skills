@@ -475,5 +475,102 @@ EOF
 out=$("$L" --bundle "$VA" 2>/dev/null) || true
 assert_contains "$out" "SUGGEST	verify-stale"
 
+echo "=== sources id / footnote ==="
+# S1: id/title 付き正準 sources + 一致する脚注はエラーなし。
+# code block・インラインコード内の文字クラス [^...] は脚注とみなさない
+FN="$WORK/fnkb"; make_bundle "$FN"
+cat > "$FN/notes/with-footnote.md" <<'EOF'
+---
+type: note
+title: with footnote
+description: id 付き sources と脚注
+tags: [misc]
+sources:
+  - id: pr-1
+    resource: "https://example.com/pr/1"
+    title: "Example PR 1"
+generated:
+  by: claude-code/claude-fable-5
+  at: 2026-08-25T00:00:00Z
+---
+# with footnote
+
+主張には出典が付く。[^pr-1]
+
+`grep -o '[^a-z]'` のような文字クラスは脚注とみなさない。
+
+```
+regex sample: [^0-9]+
+```
+
+~~~
+tilde fence sample: [^x-z]+
+~~~
+
+    indented code sample: [^a-f]+
+
+[^pr-1]: Example PR 1
+
+## 関連
+EOF
+out=$("$L" --bundle "$FN" 2>/dev/null) || true
+assert_not_contains "$out" "footnote-ref"
+assert_not_contains "$out" "source-id"
+assert_not_contains "$out" "canonical-form"
+# S2: id 始まりの単一マッピングも canonical-form で検出する
+cat > "$FN/notes/single-id.md" <<'EOF'
+---
+type: note
+title: single id
+description: id 始まりの単一マッピング
+tags: [misc]
+sources:
+  id: x-1
+  resource: "https://example.com/x"
+---
+# single id
+EOF
+out=$("$L" --bundle "$FN" 2>/dev/null) || true
+assert_contains "$out" "SUGGEST	canonical-form	$FN	notes/single-id.md	sources が単一マッピング"
+# S3: 対応する sources[].id のない脚注ラベルは footnote-ref ERROR
+cat > "$FN/notes/dangling-footnote.md" <<'EOF'
+---
+type: note
+title: dangling footnote
+description: sources に無い脚注ラベル
+tags: [misc]
+sources:
+  - resource: "https://example.com/y"
+---
+# dangling footnote
+
+出典不明の主張。[^no-such-id]
+EOF
+out=$("$L" --bundle "$FN" 2>/dev/null); rc=$?
+assert_exit "$rc" 1 "footnote-ref で exit 1"
+assert_contains "$out" "ERROR	footnote-ref	$FN	notes/dangling-footnote.md"
+assert_contains "$out" "no-such-id"
+# S4: id の slug 規則違反は SUGGEST(OKF 許容原則)、ページ内重複は ERROR(結合キーの曖昧化)
+cat > "$FN/notes/bad-ids.md" <<'EOF'
+---
+type: note
+title: bad ids
+description: id の規則違反と重複
+tags: [misc]
+sources:
+  - id: Bad_ID
+    resource: "https://example.com/a"
+  - id: dup-key
+    resource: "https://example.com/b"
+  - id: dup-key
+    resource: "https://example.com/c"
+---
+# bad ids
+EOF
+out=$("$L" --bundle "$FN" 2>/dev/null) || true
+assert_contains "$out" "SUGGEST	source-id-format	$FN	notes/bad-ids.md	sources の id が slug 規則"
+assert_contains "$out" "に違反: Bad_ID"
+assert_contains "$out" "ERROR	source-id-dup	$FN	notes/bad-ids.md	sources の id がページ内で重複: dup-key"
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

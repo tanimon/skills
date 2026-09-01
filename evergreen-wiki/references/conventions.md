@@ -21,7 +21,7 @@
 
 evergreen-wiki が扱う知識は次の3層に分かれる。
 
-1. **Raw source(生の出典)**: PR・コード・ドキュメント・調査セッション等、真実の出典。bundle には保存せず、各ページの frontmatter `sources[].resource` で参照するのみとする。URI を持つ出典(PR URL 等)はその URI をそのまま記録する。URI を持たない出典(会話・ターミナル出力等)は OKF が許容するスコープ記述子(例: `"2026-08-25 デバッグセッション: CI失敗の原因調査"`)として記録する。raw source の内容をコピー・改変して bundle 内に格納することはしない。
+1. **Raw source(生の出典)**: PR・コード・ドキュメント・調査セッション等、真実の出典。bundle には保存せず、各ページの frontmatter `sources` で参照するのみとする(出典の所在は各要素の必須キー `resource` に記録する。§3 参照)。URI を持つ出典(PR URL 等)はその URI をそのまま記録する。URI を持たない出典(会話・ターミナル出力等)は OKF が許容するスコープ記述子(例: `"2026-08-25 デバッグセッション: CI失敗の原因調査"`)として記録する。raw source の内容をコピー・改変して bundle 内に格納することはしない。
 2. **Bundle**: evergreen-wiki skill が所有・維持する OKF bundle そのもの。人間はこれを読む側であり、書式の整形やマージ等の bookkeeping は skill が担う。
 3. **Schema**: この skill の SKILL.md と本書 `references/conventions.md`。書式・分類・マージ・相互リンクの規約を定める層であり、bundle の内容そのものではない。
 
@@ -39,7 +39,7 @@ raw source の実体を bundle 内に保存する設計(`sources/` ディレク�
 | `title` | 推奨 | 表示名。本文 H1 と一致させる |
 | `description` | 推奨 | 1文要約 |
 | `tags` | 推奨 | kebab-case のタグ配列(§5 参照) |
-| `sources` | 任意(Provenance 族) | raw source への参照。`resource` を持つ要素のリスト |
+| `sources` | 任意(Provenance 族) | raw source への参照。`resource`(必須)に加え `id` / `title`(任意)を持つ要素のリスト。`id` は本文の脚注から参照できる(§4・§6 参照) |
 | `generated` | 任意(Trust 族) | 内容を実質的に書いた actor と時刻(§9 参照) |
 | `verified` | 任意(Trust 族) | 検証イベントの蓄積(§9 参照) |
 | `status` | 任意(Lifecycle 族) | `draft` \| `stable` \| `deprecated`。省略時 `stable`(§9 参照) |
@@ -56,7 +56,9 @@ title: <表示名>
 description: <1文要約>
 tags: [tag-a, tag-b]
 sources:
-  - resource: "<URI または記述子>"
+  - id: <脚注参照用の安定キー>
+    resource: "<URI または記述子>"
+    title: "<人間可読の表示ラベル>"
 generated:
   by: <actor>
   at: <ISO 8601 UTC>
@@ -74,7 +76,10 @@ stale_after: <ISO 8601 UTC>
 - **インデントは2スペース固定**とする。
 - `tags` はインラインフロー形式 `[a, b]` の1行で記述する。
 - `sources` / `verified` は**要素が1件であっても必ずブロックリスト形式**(`  - key: value`)で記述する。単一マッピングでの省略形は使わない。
-- `sources` の各要素は `- resource: "<値>"` の1行1キーとする。
+- `sources` の各要素は `resource` を必須キーとし、任意で `id` と `title` を持てる(OKF SPEC §5.1 Provenance / Sources)。`id` は本文の脚注から要素を参照するための安定キー(§4・§6 参照)、`title` は人間可読の表示ラベルである。SPEC §5.1 のその他の任意キー(`author` / `usage_count` / `last_modified` 等)は正準形には含めない(外部プロデューサー由来のものは OKF 許容原則により拒絶しない)。
+- `sources` の各要素のキーは `id` → `resource` → `title` の順(SPEC §5.1 の例示と同順)に、存在するものだけをこの順で並べる。先頭のキーを `- ` の行に置き、2キー目以降は先頭の `- ` に合わせた4スペースインデントで1行1キーとする(`verified` の要素と同じ形)。`resource` のみの要素は `- resource: "<値>"` の1行となる。
+- `sources` の `resource` / `title` の値は引用符 `"` で囲み、`id` の値は引用符なしとする。
+- `id` は slug と同じ正規表現 `^[a-z0-9][a-z0-9-]*$` に従い、同一ページ内で一意とする。OKF SPEC は `id` を「安定キー」としか定めないが、本規約では GFM 脚注ラベルとして機械検証可能にするため文字種の制約を SPEC より強めている。
 - `generated` はネストマッピング(`  by:` / `  at:` の2行)とする。
 - `verified` の各要素は `- by: <actor>` の行に続けて、その1段下のインデント(先頭の `- ` に合わせて4スペース)で `at: <値>` を記述する、2行1要素とする。
 - actor 記法(OKF §7 準拠)は次の正規表現に従う: `^(human:.+|process:.+|[^/ ]+/[^/ ]+)$`。すなわち `human:<id>`(人間)、`process:<id>`(自動プロセス)、`<producer>/<version>`(LLM 等のプロデューサー)のいずれかの形式をとる。`human:<id>` の `<id>` には GitHub username 等の識別子を用いてよい。
@@ -110,7 +115,9 @@ evergreen-wiki 以外のプロデューサーが書いた、正準形ではな�
 
     # <title>
 
-    <本文。type に応じた内容を記述する>
+    <本文。type に応じた内容を記述する。個別の主張への出典は脚注参照 [^<id>] で示す>
+
+    [^<id>]: <出典の表示ラベル>
 
     ## 関連
 
@@ -118,6 +125,7 @@ evergreen-wiki 以外のプロデューサーが書いた、正準形ではな�
     - [label](/notes/<slug>.md)
 
 - H1 見出しは frontmatter の `title` と一致させる。
+- 本文中の個別の主張に出典を紐づける場合、frontmatter `sources[].id` をラベルとする GFM 脚注参照 `[^<id>]` を主張の直後に置き、定義行 `[^<id>]: <表示ラベル>` を `## 関連` の直前にまとめて置く(OKF SPEC §5.1 の per-claim attribution。位置インデックスはリストの並べ替えで無音のまま出典を取り違えるため、安定キー `id` で結合する)。脚注ラベルは同ページの `sources[].id` のいずれかと一致しなければならず、不一致は Lint が `footnote-ref` として検出する。定義行の表示ラベルには該当要素の `title`(なければ `resource`)の値を用いる。脚注は任意であり、ページ全体の出典は従来どおり `sources` の列挙だけで足りる。
 - 本文には知識の内容そのものを記述する。`note` であれば atomic な知見1件、`concept` であれば複数の `note` を貫く洞察、`entity` であればその固有名詞に関する参照情報を記述する。
 - `## 関連` セクションに、関連するページへの双方向リンク(§6 参照)を列挙する。他のどのページからもリンクされていない `type: note` のページ(孤立ページ)は Lint がエラーとして検出する(`concept` / `entity` はバックリンク蓄積を待つ性質上、孤立していても検出対象外。operations.md §4 の `orphan` 参照)。
 
@@ -139,7 +147,7 @@ evergreen-wiki 以外のプロデューサーが書いた、正準形ではな�
 
 - リンクは bundle-relative の絶対形式 `[label](/notes/<slug>.md)` のみを用いる(OKF が推奨する Absolute 形式)。
 - 相対リンク(`[label](../notes/foo.md)` や `[label](foo.md)` 等)は用いない。
-- bundle 外へのリンク(他の bundle の `notes/` や任意の外部 URL への `[label](...)` 形式のリンク)は張らない。外部の出典は本文リンクではなく frontmatter の `sources[].resource` で表現する(§2・§3 参照)。
+- bundle 外へのリンク(他の bundle の `notes/` や任意の外部 URL への `[label](...)` 形式のリンク)は張らない。外部の出典は本文リンクではなく frontmatter の `sources[].resource` で表現する(§2・§3 参照)。本文中の個別の主張へ出典を紐づけたい場合も `[label](URL)` 形式の外部リンクは用いず、`sources[].id` を参照する脚注(§4)を用いる。URI は frontmatter に留まり、本文には安定キーだけが現れるため、外部リンク禁止の原則と両立する。
 - 関連するページ同士は必ず双方向にリンクする。A のページから B へリンクした場合、B のページからも A へのリンクを追加する。片方向リンクは Lint がエラーとして検出する対象である。
 
 ## 7. index.md / log.md 書式
@@ -198,7 +206,7 @@ Ingest 時に既存ページと新規知見を統合するかどうかは、次�
 - **同趣旨の定義**: 「同じ状況で同じ判断を導く知見」を同趣旨とみなす。表現や具体例が異なっていても、読み手が同じ場面で同じ結論に到達するのであればマージ対象である。逆に、表面上の言葉が似ていても異なる状況・異なる判断を導く知見は別ページとして扱う。
 - **マージ時の操作**: 同趣旨のページが既存であった場合、新規ページを作らず既存ページへ次の3点を反映する。
   1. 本文を統合する(新たな知見・具体例・反例を既存の記述に織り込む)。
-  2. frontmatter `sources` に新しい出典を追記する(既存の `sources` は削除しない)。
+  2. frontmatter `sources` に新しい出典を追記する(既存の `sources` は削除しない)。追記する要素の `id` が既存要素の `id` と衝突する場合は追記側の `id` を付け直し、統合した本文側の脚注ラベルも追随させる。
   3. frontmatter `generated` を、この統合作業を行った actor と時刻で更新する。
 - **`generated` を更新しない場合**: 誤字修正・インデント修正・リンク記法の正規化など、実質的な内容変更を伴わない書式調整のみを行った場合は `generated` を更新しない。`generated` は「内容を実質的に書いた actor と時刻」を表すフィールドであり、書式上の変更はこれに該当しない(§9 参照)。
 

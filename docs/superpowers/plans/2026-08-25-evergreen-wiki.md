@@ -48,6 +48,7 @@ stale_after: <ISO 8601 UTC>
 
 - `tags` はインラインフロー形式 `[a, b]` の1行
 - `sources` / `verified` は要素1件でも必ずブロックリスト(`  - key: value`)
+- `sources` の要素は `resource` 必須に加え、任意で `id`(本文脚注 `[^<id>]` からの参照キー)と `title` を `id` → `resource` → `title` の順で持てる(OKF SPEC §5.1。後続レビューで追加)
 - `generated` はネストマッピング(`  by:` / `  at:` の2行)
 - actor 記法: `human:<id>` / `process:<id>` / `<producer>/<version>`(正規表現 `^(human:.+|process:.+|[^/ ]+/[^/ ]+)$`)
 - `status` は `draft|stable|deprecated`(省略時 stable)

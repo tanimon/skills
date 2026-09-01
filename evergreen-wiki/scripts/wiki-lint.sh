@@ -87,9 +87,41 @@ check_note_file() { # bundle file
     report SUGGEST canonical-form "$b" "$rel" "verified が単一マッピング(1要素リストに正規化を推奨)" ;;
   esac
   snext=$(fm_next_line "$f" sources)
-  case "$snext" in "  resource:"*)
+  case "$snext" in "  resource:"*|"  id:"*|"  title:"*)
     report SUGGEST canonical-form "$b" "$rel" "sources が単一マッピング(1要素リストに正規化を推奨)" ;;
   esac
+  # Provenance: sources[].id の形式・一意性と、本文の脚注ラベルとの結合
+  # (SPEC §5.1: 脚注ラベルは sources[].id への join key。不一致は無音の出典取り違えになる)
+  local sids sid dup label hit
+  sids=$(fm_block "$f" | awk '/^sources:$/{on=1; next} /^[a-zA-Z_]+:/{on=0}
+                              on && /^[ -]*id:/{sub(/^[ -]*id:[ ]*/, ""); gsub(/["'\'']/, ""); print}')
+  while read -r sid; do
+    [ -n "$sid" ] || continue
+    # 文字種違反は「OKF 的には妥当・正準形違反」なので SUGGEST(§3 OKF 許容原則。ERROR にすると
+    # SPEC 準拠の外部 bundle を exit 1 で拒絶してしまう)
+    echo "$sid" | grep -Eq "$SLUG_RE" ||
+      report SUGGEST source-id-format "$b" "$rel" "sources の id が slug 規則(^[a-z0-9][a-z0-9-]*\$)に違反: $sid"
+  done <<< "$sids"
+  # 重複は結合キーの曖昧化(無音の出典取り違え)であり OKF 的にも妥当でないため ERROR
+  dup=$(printf '%s\n' "$sids" | grep -v '^$' | sort | uniq -d)
+  while read -r sid; do
+    [ -n "$sid" ] || continue
+    report ERROR source-id-dup "$b" "$rel" "sources の id がページ内で重複: $sid"
+  done <<< "$dup"
+  # 本文(frontmatter 以降)の脚注ラベル(参照 [^id] と定義 [^id]: の双方)を全数捕捉してから照合する。
+  # fenced code block(``` / ~~~)・インデントコード行・インラインコードは除外する
+  # (正規表現の文字クラス [^...] を脚注と誤認しないため。インデント除外の代償として
+  # ネストリスト内の脚注参照は拾えないが、ERROR の偽陽性より安い)。
+  # ラベルの抽出は id と同じ文字種 [a-z0-9-] に限定する(規則外ラベルは code 外の文字クラス等の
+  # 誤検出源)。代償として非 slug な id を使う外部 bundle では footnote-ref が効かない(既知の偽陰性)
+  # shellcheck disable=SC2016 # sed のバッククォートはインラインコード除去のリテラル。展開意図はない
+  while read -r label; do
+    [ -n "$label" ] || continue
+    hit=$(printf '%s\n' "$sids" | grep -Fx -- "$label" || true)
+    [ -n "$hit" ] ||
+      report ERROR footnote-ref "$b" "$rel" "脚注ラベル [^${label}] に対応する sources の id がない"
+  done < <(awk '/^---$/{n++; next} n>=2' "$f" | awk '/^(```|~~~)/{fence=!fence; next} !fence && !/^(    |\t)/' \
+             | sed 's/`[^`]*`//g' | grep -o '\[\^[a-z0-9-][a-z0-9-]*\]' | sed 's/^\[\^//; s/\]$//' | sort -u)
   # Lifecycle: stale_after 超過(ISO 8601 UTC は文字列比較で成立。fm_get が引用符を剥がすので
   # 引用符付き timestamp でも誤判定しない)
   local sa; sa=$(fm_get "$f" stale_after)

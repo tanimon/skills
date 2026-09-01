@@ -81,7 +81,7 @@ stale_after: 2027-08-25T00:00:00Z # Lifecycle 族: 時限性のある知識の�
 
 ### 正準シリアライズ形式(canonical form)
 
-`conventions.md` は frontmatter の意味論だけでなく**シリアライズ形式そのものを規範化する**: キーの順序固定、2スペースインデント固定、`sources`/`verified` は要素1件でも必ずリスト形式、`- resource:`/`- by:` は1行1キー。理由は2つ:
+`conventions.md` は frontmatter の意味論だけでなく**シリアライズ形式そのものを規範化する**: キーの順序固定、2スペースインデント固定、`sources`/`verified` は要素1件でも必ずリスト形式、1行1キー(`sources` 要素は `id` → `resource` → `title` の順。`id` は本文脚注 `[^<id>]` からの per-claim 参照キー、OKF SPEC §5.1)。理由は2つ:
 
 1. この skill が唯一のプロデューサーである限り、常に正準形で書き出せる
 2. lint を bash + 標準ツールで実装するため。grep/awk は YAML を解析できず、既知の正準形への行アンカーのパターンマッチしかできない。正準形の規範化により「(a) 正準形に一致するかの検証 → (b) 正準形を前提とした意味チェック」の二段構えが成立する

@@ -26,7 +26,7 @@ description: >-
 
 ## 三層モデル
 
-1. **Raw source(生の出典)**: PR・コード・ドキュメント・調査セッション等、真実の出典。bundle には保存せず、各ページの frontmatter `sources[].resource` で参照するのみ。コピー・改変はしない。
+1. **Raw source(生の出典)**: PR・コード・ドキュメント・調査セッション等、真実の出典。bundle には保存せず、各ページの frontmatter `sources`(必須キー `resource`、任意で脚注参照用の `id` と表示ラベル `title`)で参照するのみ。コピー・改変はしない。
 2. **Bundle**: この skill が所有・維持する OKF bundle そのもの。人間は読む側。
 3. **Schema**: この SKILL.md と `references/conventions.md`。書式・分類・マージ・相互リンクの規約を定める層。
 
