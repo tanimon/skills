@@ -27,10 +27,12 @@ for b in "${BUNDLES[@]}"; do
     if [ -n "$TAG" ]; then
       # grep -q の早期 exit が pipefail 下で上流の SIGPIPE を招き、一致したのに
       # パイプライン全体が非0 → 偽陰性になりうる。-q を使わず全量を捕捉してから判定する
-      tag_hit=$(fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -x -- "$TAG" || true)
+      tag_hit=$(fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -Fx -- "$TAG" || true)
       [ -n "$tag_hit" ] || continue
     fi
-    if [ -n "$KEYWORD" ]; then grep -qi -- "$KEYWORD" "$f" || continue; fi
+    # -F: keyword は固定文字列として検索する(正規表現扱いだとメタ文字入りの語で
+    # grep がエラーを吐きつつ無ヒット扱いになるサイレント失敗が起きる)
+    if [ -n "$KEYWORD" ]; then grep -qiF -- "$KEYWORD" "$f" || continue; fi
     st=$(fm_get "$f" status); [ -n "$st" ] || st=stable
     printf '%s\t%s\t%s\t%s\t%s\n' "$b" "$slug" "$t" "$st" "$(fm_get "$f" description)"
   done

@@ -27,14 +27,16 @@ emit_project() {
   top=$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || abspath "$ROOT" || true)
   [ -n "$top" ] || return 0
   local user_abs; user_abs=$(abspath "$USER_BUNDLE" || true)
-  find "$top" -maxdepth 4 \
-    \( -name node_modules -o -name .git -o -name vendor -o -name dist -o -name build \) -prune \
-    -o -name index.md -print 2>/dev/null |
+  # find は permission-denied なサブツリーがあると非0終了する。パイプで受けると pipefail が
+  # それを拾い、bundle を出力済みでもスクリプト全体が exit 1 で死ぬ(発見リストの無音の切り詰め)。
+  # process substitution + || true で find の終了コードを無視する
   while read -r f; do
     d=$(dirname "$f")
     [ "$(abspath "$d")" = "${user_abs:-}" ] && continue
     if is_bundle "$d"; then printf 'project\t%s\n' "$(abspath "$d")"; fi
-  done
+  done < <(find "$top" -maxdepth 4 \
+    \( -name node_modules -o -name .git -o -name vendor -o -name dist -o -name build \) -prune \
+    -o -name index.md -print 2>/dev/null || true)
 }
 case "$SCOPE" in
   user) emit_user ;;

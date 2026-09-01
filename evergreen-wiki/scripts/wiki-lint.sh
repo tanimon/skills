@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # evergreen-wiki/scripts/wiki-lint.sh — bundle の健全性検査
 # 出力: <severity>\t<check>\t<bundle>\t<file>\t<detail>。ERROR ありなら exit 1
+# bundle が1件も見つからなければ何も出力せず exit 0
 set -uo pipefail
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 . "$SCRIPT_DIR/lib.sh"
@@ -100,9 +101,11 @@ check_note_file() { # bundle file
   gat=$(awk '/^---$/{n++; next} n>=2{exit} n!=1{next}
              /^generated:$/{on=1; next} /^[a-zA-Z_]+:/{on=0}
              on && /^  at:/{sub(/^  at:[ ]*/, ""); gsub(/["'\'']/, ""); print; exit}' "$f")
+  # at: は行頭アンカーで抽出する(/at:/ だと by: 行の値に "at:" を含む actor を拾い、
+  # sort 汚染で verify-stale の偽陰性になる)
   vat=$(awk '/^---$/{n++; next} n>=2{exit} n!=1{next}
              /^verified:$/{on=1; next} /^[a-zA-Z_]+:/{on=0}
-             on && /at:/{sub(/^.*at:[ ]*/, ""); gsub(/["'\'']/, ""); print}' "$f" | sort | tail -n1)
+             on && /^[ -]*at:/{sub(/^[ -]*at:[ ]*/, ""); gsub(/["'\'']/, ""); print}' "$f" | sort | tail -n1)
   if [ -n "$gat" ] && [ -n "$vat" ] && [ "$vat" \< "$gat" ]; then
     report SUGGEST verify-stale "$b" "$rel" "最新の検証($vat)が generated($gat)より古い(再検証候補)"
   fi
@@ -153,7 +156,7 @@ check_bundle_cross() { # bundle
     t=$(fm_get "$f" type)
     if [ "$t" = "note" ]; then
       grep -q ">$slug\$" "$LINKS_FILE" ||
-        report ERROR orphan "$b" "notes/$slug.md" "他の note からの被リンクなし"
+        report ERROR orphan "$b" "notes/$slug.md" "他のどのページからも被リンクなし"
     fi
   done
   if [ "$has_index" = 1 ]; then
@@ -165,10 +168,23 @@ check_bundle_cross() { # bundle
     bad_fm=$(fm_block "$b/index.md" | grep -Ev '^okf_version:')
     [ -n "$bad_fm" ] &&
       report ERROR index-format "$b" "index.md" "frontmatter に okf_version 以外のキーがある"
+    # okf_version は bundle マーカーそのもの。欠落すると bundle-locate.sh が発見できなくなるのに
+    # lint は clean と報告する偽陰性になるため、必ず検査する(frontmatter ごと無い場合も検出)
+    [ -n "$(fm_get "$b/index.md" okf_version)" ] ||
+      report ERROR index-format "$b" "index.md" "frontmatter に okf_version がない(bundle マーカー喪失: bundle-locate が発見できない)"
     # 候補は - 箇条書きも含めて拾う(- で書かれた index を無検査で素通りさせない)
     bad_entry=$(grep -E '^[*-] ' "$b/index.md" | grep -Ev '^\* \[[^]]+\]\(/notes/[a-z0-9][a-z0-9-]*\.md\) - .+')
     [ -n "$bad_entry" ] &&
       report ERROR index-format "$b" "index.md" "エントリ行が「* [title](/notes/slug.md) - description」形式でない(箇条書き記号は * のみ)"
+    # index-dangling: 存在しないページを記載したエントリ(ページ統合・削除の取り残し)。
+    # broken-link は notes/ 内のリンクのみ、index-miss は note→index の一方向のみを見るため、
+    # index→note 方向の実在確認はここで行う
+    local entry_to
+    while read -r entry_to; do
+      [ -n "$entry_to" ] || continue
+      [ -f "$b/notes/$entry_to.md" ] ||
+        report ERROR index-dangling "$b" "index.md" "存在しないページを記載: /notes/${entry_to}.md"
+    done < <(grep -o '](/notes/[a-z0-9][a-z0-9-]*\.md)' "$b/index.md" | sed 's|](/notes/||; s|\.md)||' | sort -u)
   fi
   if [ "$has_log" = 1 ]; then
     # log-format: 日付見出しの形式と降順(同様にコマンド置換で捕捉してから判定)
@@ -194,7 +210,7 @@ check_bundle_cross() { # bundle
       [ -e "$f" ] || continue
       [ "$(fm_get "$f" type)" = "concept" ] || continue
       # grep -q の早期 exit による SIGPIPE + pipefail の偽陰性を避けるため全量捕捉してから判定
-      tag_hit=$(fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -x -- "$tag" || true)
+      tag_hit=$(fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -Fx -- "$tag" || true)
       [ -n "$tag_hit" ] && { has_concept=1; break; }
     done
     [ "$has_concept" = 0 ] && report SUGGEST concept-candidate "$b" "-" "タグ ${tag} を5件以上が共有(concept ページ候補)"

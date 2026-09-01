@@ -112,9 +112,10 @@
    | `link-format` | 本文中の `](/notes/...)` リンクが正規形式 `[label](/notes/<slug>.md)` でない(空 slug・規則外 slug 等) | conventions.md §6 のリンク記法に修正する |
    | `broken-link` | 本文中の `[label](/notes/<slug>.md)` のリンク先が bundle 内に存在しない | リンク先ページを作成するか、リンクを削除・修正する |
    | `index-miss` | `notes/` 配下のページが `index.md` に記載されていない | `index.md` の該当 type セクションへ1行追加する |
+   | `index-dangling` | `index.md` のエントリが存在しないページ(`/notes/<slug>.md`)を記載している(ページ統合・削除の取り残し) | エントリを削除するか、後継ページのエントリに差し替える |
    | `one-way-link` | A→B のリンクがあるのに B→A のリンクが無い(片方向リンク) | B 側のページに A への逆リンクを追加し双方向にする |
    | `orphan` | `type: note` のページが他のどのページからもリンクされていない(孤立ページ) | 関連する既存ページからリンクするか、`## 関連` に関連ページを追加する |
-   | `index-format` | `index.md` の frontmatter に `okf_version` 以外のキーがある、またはエントリ行(`* ` / `- ` 始まりの行)が `* [title](/notes/slug.md) - description` 形式でない(`- ` 箇条書きも違反として検出する) | conventions.md §7 の正準形式に修正する |
+   | `index-format` | `index.md` の frontmatter に `okf_version` 以外のキーがある、`okf_version` が無い(frontmatter ごと無い場合を含む。bundle マーカー喪失で `bundle-locate.sh` から発見されなくなる)、またはエントリ行(`* ` / `- ` 始まりの行)が `* [title](/notes/slug.md) - description` 形式でない(`- ` 箇条書きも違反として検出する) | conventions.md §7 の正準形式に修正する |
    | `log-format` | `log.md` の日付見出しが `## YYYY-MM-DD` 形式でない、または新しい日付が上に来る降順で並んでいない | conventions.md §7 の正準形式に修正する |
 
    **SUGGEST(判断材料。exit code には影響しない)**

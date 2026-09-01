@@ -161,11 +161,11 @@ make_bundle() {
 ---
 okf_version: "0.2"
 ---
-# Concepts
+# concept
 
-# Entities
+# entity
 
-# Notes
+# note
 * [パイプは exit code を隠す](/notes/pipe-exit-code.md) - パイプ末尾の exit code だけが返る
 * [set -o pipefail の使いどころ](/notes/pipefail-usage.md) - パイプ中間の失敗を検出する
 EOF
@@ -828,7 +828,7 @@ git commit -m "feat: wiki-lint.sh の bundle 横断検査を追加"
 3. 見つからない場合のみ場所を決める。user: ~/knowledge/ 固定。
    project: git toplevel 配下の候補(docs/knowledge/ 等)を提示して AskUserQuestion で確認
 4. scaffold を作成(以下のテンプレートを全文記載):
-   - index.md: okf_version frontmatter + 「# Concepts / # Entities / # Notes」の空セクション
+   - index.md: okf_version frontmatter + 「# concept / # entity / # note」の空セクション
    - log.md: 「# Update Log」+ 当日見出し + 「bundle 作成」エントリ
    - notes/ ディレクトリ
 5. git 管理を推奨として案内(user bundle は独立リポジトリ化を提案。強制しない)
@@ -923,7 +923,7 @@ Run:
 ```bash
 T=$(mktemp -d)
 mkdir -p "$T/kb/notes"
-printf -- '---\nokf_version: "0.2"\n---\n# Concepts\n\n# Entities\n\n# Notes\n' > "$T/kb/index.md"
+printf -- '---\nokf_version: "0.2"\n---\n# concept\n\n# entity\n\n# note\n' > "$T/kb/index.md"
 printf -- '# Update Log\n\n## %s\n* bundle 作成\n' "$(date -u +%Y-%m-%d)" > "$T/kb/log.md"
 bash evergreen-wiki/scripts/wiki-lint.sh --bundle "$T/kb"; echo "exit=$?"
 rm -rf "$T"

@@ -411,5 +411,69 @@ EOF
 out=$("$L" --bundle "$CS" 2>/dev/null) || true
 assert_contains "$out" "SUGGEST	canonical-form	$CS	notes/single-sources.md	sources が単一マッピング"
 
+echo "=== review round 3 regressions ==="
+# R1: 読み取り不可のサブディレクトリがあっても bundle-locate は exit 1 で死なず、
+# 発見済み bundle を無音で取りこぼさない(find の permission-denied 非0終了 + pipefail 起因)
+PD="$WORK/permdenied"; make_bundle "$PD/docs/knowledge"
+mkdir -p "$PD/secret"; chmod 000 "$PD/secret"
+out=$(EVERGREEN_USER_BUNDLE="$WORK/nonexistent" "$SCRIPT_DIR/bundle-locate.sh" --root "$PD"); rc=$?
+chmod 755 "$PD/secret"
+assert_exit "$rc" 0 "読み取り不可ディレクトリがあっても exit 0"
+assert_contains "$out" "project	$PD/docs/knowledge"
+# R2: okf_version を持たない index.md は index-format ERROR(bundle マーカー喪失の検出)
+NV="$WORK/noverkb"; make_bundle "$NV"
+printf -- '---\ntitle: not a marker\n---\n# note\n' > "$NV/index.md"
+out=$("$L" --bundle "$NV" 2>/dev/null); rc=$?
+assert_exit "$rc" 1 "okf_version 欠落で exit 1"
+assert_contains "$out" "frontmatter に okf_version がない"
+# R2 派生: frontmatter ごと無い index.md も同様に検出する
+printf '# just markdown\n' > "$NV/index.md"
+out=$("$L" --bundle "$NV" 2>/dev/null); rc=$?
+assert_exit "$rc" 1 "frontmatter なし index.md で exit 1"
+assert_contains "$out" "frontmatter に okf_version がない"
+# R3: index.md の宙ぶらりんエントリ(存在しないページへの参照)は index-dangling ERROR
+DG="$WORK/danglingkb"; make_bundle "$DG"
+printf '* [削除済みページ](/notes/deleted-note.md) - もう存在しない\n' >> "$DG/index.md"
+out=$("$L" --bundle "$DG"); rc=$?
+assert_exit "$rc" 1 "宙ぶらりん index エントリで exit 1"
+assert_contains "$out" "ERROR	index-dangling	$DG	index.md"
+assert_contains "$out" "/notes/deleted-note.md"
+# R4: --keyword は固定文字列として検索する(正規表現メタ文字で grep が黙って失敗しない)
+FK="$WORK/fixedkb"; make_bundle "$FK"
+cat > "$FK/notes/regex-chars.md" <<'EOF'
+---
+type: note
+title: regex chars
+description: 本文に a[b を含む
+tags: [misc]
+---
+# regex chars
+
+本文に a[b を含む。
+EOF
+out=$("$Q" --bundle "$FK" --keyword 'a[b' 2>&1); rc=$?
+assert_exit "$rc" 0 "正規表現メタ文字を含む keyword でも exit 0"
+assert_contains "$out" "regex-chars"
+# R5: verified の at: 抽出は by: 行の値に "at:" を含む actor を拾わない
+# (拾うと sort 汚染で verify-stale の偽陰性になる)
+VA="$WORK/atkb"; make_bundle "$VA"
+cat > "$VA/notes/at-actor.md" <<'EOF'
+---
+type: note
+title: at actor
+description: by の値に at: を含む actor
+tags: [misc]
+generated:
+  by: claude-code/claude-fable-5
+  at: 2026-08-25T02:00:00Z
+verified:
+  - by: process:legacy-at: zzz
+    at: 2026-08-25T01:00:00Z
+---
+# at actor
+EOF
+out=$("$L" --bundle "$VA" 2>/dev/null) || true
+assert_contains "$out" "SUGGEST	verify-stale"
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
