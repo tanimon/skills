@@ -102,26 +102,37 @@ check_note_file() { # bundle file
     echo "$sid" | grep -Eq "$SLUG_RE" ||
       report SUGGEST source-id-format "$b" "$rel" "sources の id が slug 規則(^[a-z0-9][a-z0-9-]*\$)に違反: $sid"
   done <<< "$sids"
-  # 重複は結合キーの曖昧化(無音の出典取り違え)であり OKF 的にも妥当でないため ERROR
+  # 重複は結合キーの曖昧化(無音の出典取り違え)なので ERROR。SPEC §5.1 は id を
+  # 「個別の主張を属性付けする安定キー」と定めており、重複キーはその役目を果たせない(SPEC の含意)
   dup=$(printf '%s\n' "$sids" | grep -v '^$' | sort | uniq -d)
   while read -r sid; do
     [ -n "$sid" ] || continue
     report ERROR source-id-dup "$b" "$rel" "sources の id がページ内で重複: $sid"
   done <<< "$dup"
   # 本文(frontmatter 以降)の脚注ラベル(参照 [^id] と定義 [^id]: の双方)を全数捕捉してから照合する。
-  # fenced code block(``` / ~~~)・インデントコード行・インラインコードは除外する
+  # fenced code block(``` / ~~~。フェンスは同種の記号でのみ閉じる: ``` 内の ~~~ 行は内容として
+  # 除外を継続する)・4スペース/タブのインデントコード行・インラインコードは除外する
   # (正規表現の文字クラス [^...] を脚注と誤認しないため。インデント除外の代償として
-  # ネストリスト内の脚注参照は拾えないが、ERROR の偽陽性より安い)。
-  # ラベルの抽出は id と同じ文字種 [a-z0-9-] に限定する(規則外ラベルは code 外の文字クラス等の
-  # 誤検出源)。代償として非 slug な id を使う外部 bundle では footnote-ref が効かない(既知の偽陰性)
+  # 4スペース以上インデントされたネストリスト内の脚注参照は拾えないが、ERROR の偽陽性より安い。
+  # フェンス長・info string の CommonMark 細則までは判定しない近似である)。
+  # ラベルの抽出は id と同じ slug 規則(先頭 [a-z0-9]、以降 [a-z0-9-])に限定する。
+  # [^-abc] のような先頭ハイフンの文字クラスを拾わないための制約でもある。代償が2つ:
+  # 非 slug な id を使う外部 bundle では footnote-ref が効かない(既知の偽陰性)、および
+  # slug 文字種のみの文字クラス([^a-z] 等)を code で囲まず本文に書くと偽陽性 ERROR になる
+  # (本文中の正規表現・コード断片はインラインコード必須。conventions.md §4)
   # shellcheck disable=SC2016 # sed のバッククォートはインラインコード除去のリテラル。展開意図はない
   while read -r label; do
     [ -n "$label" ] || continue
     hit=$(printf '%s\n' "$sids" | grep -Fx -- "$label" || true)
     [ -n "$hit" ] ||
       report ERROR footnote-ref "$b" "$rel" "脚注ラベル [^${label}] に対応する sources の id がない"
-  done < <(awk '/^---$/{n++; next} n>=2' "$f" | awk '/^(```|~~~)/{fence=!fence; next} !fence && !/^(    |\t)/' \
-             | sed 's/`[^`]*`//g' | grep -o '\[\^[a-z0-9-][a-z0-9-]*\]' | sed 's/^\[\^//; s/\]$//' | sort -u)
+  done < <(awk '/^---$/{n++; next} n>=2' "$f" \
+             | awk '/^(```|~~~)/ { t = substr($0, 1, 1)
+                                   if (fence == "") fence = t
+                                   else if (fence == t) fence = ""
+                                   next }
+                    fence == "" && !/^(    |\t)/' \
+             | sed 's/`[^`]*`//g' | grep -o '\[\^[a-z0-9][a-z0-9-]*\]' | sed 's/^\[\^//; s/\]$//' | sort -u)
   # Lifecycle: stale_after 超過(ISO 8601 UTC は文字列比較で成立。fm_get が引用符を剥がすので
   # 引用符付き timestamp でも誤判定しない)
   local sa; sa=$(fm_get "$f" stale_after)

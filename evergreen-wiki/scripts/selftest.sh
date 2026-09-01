@@ -477,7 +477,8 @@ assert_contains "$out" "SUGGEST	verify-stale"
 
 echo "=== sources id / footnote ==="
 # S1: id/title 付き正準 sources + 一致する脚注はエラーなし。
-# code block・インラインコード内の文字クラス [^...] は脚注とみなさない
+# well-formed な ```/~~~ ペア・``` 内の ~~~ 行・インデント行・インラインコード内の
+# 文字クラス [^...]、および code 外の先頭ハイフン文字クラス [^-abc] は脚注とみなさない
 FN="$WORK/fnkb"; make_bundle "$FN"
 cat > "$FN/notes/with-footnote.md" <<'EOF'
 ---
@@ -501,6 +502,7 @@ generated:
 
 ```
 regex sample: [^0-9]+
+~~~ backtick フェンス内の ~~~ 行は内容: [^mixed-fence]
 ```
 
 ~~~
@@ -508,6 +510,8 @@ tilde fence sample: [^x-z]+
 ~~~
 
     indented code sample: [^a-f]+
+
+code 外でも先頭ハイフンの文字クラス [^-abc] は拾わない。
 
 [^pr-1]: Example PR 1
 
@@ -532,7 +536,8 @@ sources:
 EOF
 out=$("$L" --bundle "$FN" 2>/dev/null) || true
 assert_contains "$out" "SUGGEST	canonical-form	$FN	notes/single-id.md	sources が単一マッピング"
-# S3: 対応する sources[].id のない脚注ラベルは footnote-ref ERROR
+# S3: 対応する sources[].id のない脚注ラベルは footnote-ref ERROR。
+# 混在フェンス(``` 内の ~~~ 行)の後の本文も走査から消えない(偽陰性の回帰防止)
 cat > "$FN/notes/dangling-footnote.md" <<'EOF'
 ---
 type: note
@@ -543,6 +548,10 @@ sources:
   - resource: "https://example.com/y"
 ---
 # dangling footnote
+
+```
+inside backtick fence: ~~~ は閉じフェンスではない
+```
 
 出典不明の主張。[^no-such-id]
 EOF
