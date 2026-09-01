@@ -187,6 +187,17 @@ evergreen-wiki/
 - 本リポジトリに `evergreen-wiki/` として作成し、利用時は `~/.claude/skills/evergreen-wiki` への symlink を張る
 - ドキュメント類(SKILL.md / references / 本設計書)はすべて日本語で記載する
 
+#### 未決事項: 既存 `llm-wiki` skill との併存(symlink 配備前に要決定)
+
+`~/.claude/skills/` には別リポジトリ由来の `llm-wiki` skill が既にインストールされており、本 skill と次の点で競合する。
+
+- 同じファイルレイアウト(index.md + log.md + notes/&lt;slug&gt;.md)・同じ type 語彙(concept / entity)を持つ
+- トリガー語が重複する(「ナレッジを検索して」「lint して」等)
+- 発動ポリシーが正反対(llm-wiki は自律発動あり / 本 skill は明示呼び出しのみ)
+- bundle モデルが異なる(llm-wiki は単一統合 wiki / 本 skill は user + project の複数 bundle)
+
+この状態で symlink を張ると skill 選択が非決定的になるため、配備前に次のいずれかを決定する: (a) llm-wiki を置換(supersede)する、(b) トリガー語を棲み分けて併存させる、(c) 本 skill は symlink せずプロジェクトローカルで使う。
+
 ## 7. スコープ外(将来の拡張ポイント)
 
 - Attested Computation type(OKF §10): ナレッジベース用途では不要
