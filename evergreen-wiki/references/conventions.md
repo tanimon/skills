@@ -77,7 +77,7 @@ stale_after: <ISO 8601 UTC>
 - `sources` の各要素は `- resource: "<値>"` の1行1キーとする。
 - `generated` はネストマッピング(`  by:` / `  at:` の2行)とする。
 - `verified` の各要素は `- by: <actor>` の行に続けて、その1段下のインデント(先頭の `- ` に合わせて4スペース)で `at: <値>` を記述する、2行1要素とする。
-- actor 記法(OKF §7 準拠)は次の正規表現に従う: `^(human:.+|process:.+|[^/ ]+/[^/ ]+)$`。すなわち `human:<id>`(人間)、`process:<id>`(自動プロセス)、`<producer>/<version>`(LLM 等のプロデューサー)のいずれかの形式をとる。個人を特定できる実名は書かず、`human:<id>` のようなプレースホルダを用いる。
+- actor 記法(OKF §7 準拠)は次の正規表現に従う: `^(human:.+|process:.+|[^/ ]+/[^/ ]+)$`。すなわち `human:<id>`(人間)、`process:<id>`(自動プロセス)、`<producer>/<version>`(LLM 等のプロデューサー)のいずれかの形式をとる。`human:<id>` の `<id>` には GitHub username 等の識別子を用いてよい。
 - `at` の時刻は ISO 8601 UTC(`YYYY-MM-DDTHH:MM:SSZ`)形式とする。前後比較は文字列比較で行える形式であるため、日付パーサへの依存を持たない。
 - `status` は `draft|stable|deprecated` のいずれかであり、省略時は `stable` として扱う。
 

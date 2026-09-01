@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- ドキュメント(SKILL.md / references)はすべて日本語。特定個人名は書かない(actor 例は `human:<id>`)
+- ドキュメント(SKILL.md / references)はすべて日本語。plan doc・skill ファイル群中には実在する個人を特定する情報を書かない(alice / bob 等のダミー名は可)。運用時の bundle 内 actor `human:<id>` の `<id>` には GitHub username 等の識別子を用いてよい
 - スクリプトは bash + 標準ツールのみ。python/jq/yq 等に依存しない
 - スクリプトはどの CWD からでも動く(`SCRIPT_DIR` 基準で相互参照、bundle は引数か `bundle-locate.sh` で解決)
 - リンク記法は bundle-relative 絶対形式 `[label](/notes/<slug>.md)` のみ
