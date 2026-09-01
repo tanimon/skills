@@ -25,7 +25,10 @@ for b in "${BUNDLES[@]}"; do
     t=$(fm_get "$f" type)
     [ -n "$TYPE" ] && [ "$t" != "$TYPE" ] && continue
     if [ -n "$TAG" ]; then
-      fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -qx -- "$TAG" || continue
+      # grep -q の早期 exit が pipefail 下で上流の SIGPIPE を招き、一致したのに
+      # パイプライン全体が非0 → 偽陰性になりうる。-q を使わず全量を捕捉してから判定する
+      tag_hit=$(fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -x -- "$TAG" || true)
+      [ -n "$tag_hit" ] || continue
     fi
     if [ -n "$KEYWORD" ]; then grep -qi -- "$KEYWORD" "$f" || continue; fi
     st=$(fm_get "$f" status); [ -n "$st" ] || st=stable

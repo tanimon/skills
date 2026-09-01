@@ -13,7 +13,9 @@ USER_BUNDLE="${EVERGREEN_USER_BUNDLE:-$HOME/knowledge}"
 # okf_version frontmatter を持つ index.md があるディレクトリだけが bundle
 is_bundle() {
   [ -f "$1/index.md" ] || return 1
-  awk '/^---$/{n++; next} n==1{print} n>=2{exit}' "$1/index.md" | grep -q '^okf_version:'
+  # 単一 awk で判定する。awk | grep -q だと grep の早期 exit 後の書き込みが SIGPIPE になり、
+  # pipefail 下で bundle が「発見されないまま exit 0」で終わる偽陰性を生むため
+  awk '/^---$/{n++; next} n>=2{exit} n==1 && /^okf_version:/{found=1; exit} END{exit !found}' "$1/index.md"
 }
 abspath() { (cd "$1" 2>/dev/null && pwd); }
 

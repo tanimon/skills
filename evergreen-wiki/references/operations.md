@@ -108,18 +108,20 @@
    | `conformance-frontmatter` | frontmatter が存在しないか、閉じる `---` が無い | conventions.md §3 の正準形で frontmatter を追加する |
    | `conformance-type` | `type` フィールドが欠落または空 | `type` に `note` / `concept` / `entity` 等を設定する |
    | `actor-format` | `generated` / `verified` の `by:` が actor 記法(`^(human:.+\|process:.+\|[^/ ]+/[^/ ]+)$`)に違反 | conventions.md §3 の actor 記法(`human:<id>` / `process:<id>` / `<producer>/<version>`)に沿って書き直す |
+   | `slug-format` | `notes/` 配下のファイル名が slug 規則(`^[a-z0-9][a-z0-9-]*$`、conventions.md §5)に違反 | ファイル名を slug 規則に沿って変更する。違反ページは正規リンク記法で参照できないため、相互リンク検査(`broken-link` / `one-way-link` / `orphan` / `index-miss`)の対象外になる |
+   | `link-format` | 本文中の `](/notes/...)` リンクが正規形式 `[label](/notes/<slug>.md)` でない(空 slug・規則外 slug 等) | conventions.md §6 のリンク記法に修正する |
    | `broken-link` | 本文中の `[label](/notes/<slug>.md)` のリンク先が bundle 内に存在しない | リンク先ページを作成するか、リンクを削除・修正する |
    | `index-miss` | `notes/` 配下のページが `index.md` に記載されていない | `index.md` の該当 type セクションへ1行追加する |
    | `one-way-link` | A→B のリンクがあるのに B→A のリンクが無い(片方向リンク) | B 側のページに A への逆リンクを追加し双方向にする |
    | `orphan` | `type: note` のページが他のどのページからもリンクされていない(孤立ページ) | 関連する既存ページからリンクするか、`## 関連` に関連ページを追加する |
-   | `index-format` | `index.md` の frontmatter に `okf_version` 以外のキーがある、またはエントリ行が `* [title](/notes/slug.md) - description` 形式でない | conventions.md §7 の正準形式に修正する |
+   | `index-format` | `index.md` の frontmatter に `okf_version` 以外のキーがある、またはエントリ行(`* ` / `- ` 始まりの行)が `* [title](/notes/slug.md) - description` 形式でない(`- ` 箇条書きも違反として検出する) | conventions.md §7 の正準形式に修正する |
    | `log-format` | `log.md` の日付見出しが `## YYYY-MM-DD` 形式でない、または新しい日付が上に来る降順で並んでいない | conventions.md §7 の正準形式に修正する |
 
    **SUGGEST(判断材料。exit code には影響しない)**
 
    | check id | 検出内容 | 対処方法 |
    |---|---|---|
-   | `canonical-form` | frontmatter のキー順序が正準順(conventions.md §3)でない、または `verified` が単一マッピングで書かれている(1要素でもリスト形式でない) | conventions.md §3 の正準形に正規化する。外部プロデューサー由来の非正準 YAML はエラーではなく正規化の提案として扱う(conventions.md §3「OKF 許容原則」) |
+   | `canonical-form` | frontmatter のキー順序が正準順(conventions.md §3)でない、または `verified` / `sources` が単一マッピングで書かれている(1要素でもリスト形式でない) | conventions.md §3 の正準形に正規化する。外部プロデューサー由来の非正準 YAML はエラーではなく正規化の提案として扱う(conventions.md §3「OKF 許容原則」) |
    | `stale` | `stale_after` の期限を超過している | 内容を見直し、`stale_after` の更新、または `status: deprecated` への変更を検討する(conventions.md §9) |
    | `verify-stale` | 最新の `verified.at` が `generated.at` より古い(検証失効。マージで内容が変わったのに再検証されていない) | 内容を再確認し、`verified` に新しい検証イベントを追記する(既存の `verified` は削除しない) |
    | `concept-candidate` | 同一タグを `concept` 以外のページが5件以上共有しているが、そのタグを持つ `concept` ページが無い | 該当ページ群を束ねる `concept` ページの新設を検討する(conventions.md §5) |

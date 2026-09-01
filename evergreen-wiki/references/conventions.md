@@ -144,6 +144,8 @@ evergreen-wiki 以外のプロデューサーが書いた、正準形ではな�
 
 ## 7. index.md / log.md 書式
 
+箇条書き記号はファイルごとに固定する: `index.md` のエントリ行は `* `、`log.md` の変更履歴と本文の `## 関連`(§4)は `- ` を用いる。`wiki-lint.sh` の `index-format` はこの規則を前提に検査する(`- ` で書かれた index エントリ行は形式違反として検出される)。
+
 ### index.md
 
 bundle root にのみ存在し、`okf_version: "0.2"` を持つ唯一のファイルである。

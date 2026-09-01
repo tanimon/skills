@@ -65,7 +65,7 @@ log.md: `# Update Log` の下に `## YYYY-MM-DD`(新しい順)+ 箇条書き。
 **Interfaces:**
 - Produces: 正準シリアライズ形式・type 体系・命名・リンク・index/log 書式・マージ判定・Trust/Lifecycle 運用の規範。Task 4-6 はこの文書の規則を実装・参照する
 
-- [ ] **Step 1: conventions.md を書く**
+- [x] **Step 1: conventions.md を書く**
 
 以下の章立てで、設計書 §2〜§4 の内容を規範として日本語で記述する(各章は設計書の対応箇所を過不足なく落とし込む。「後で決める」等の未確定記述を残さない):
 
@@ -108,7 +108,7 @@ log.md: `# Update Log` の下に `## YYYY-MM-DD`(新しい順)+ 箇条書き。
  status の使い分け。deprecated は削除せず後継リンク。stale_after は時限知識のみ)
 ```
 
-- [ ] **Step 2: 規範の自己整合を検証する**
+- [x] **Step 2: 規範の自己整合を検証する**
 
 Run: `grep -c '^## ' evergreen-wiki/references/conventions.md`
 Expected: 9(全9章が存在)
@@ -116,7 +116,7 @@ Expected: 9(全9章が存在)
 Run: `grep -n 'okf_version\|human:<id>\|/notes/<slug>.md' evergreen-wiki/references/conventions.md | head`
 Expected: 3種すべてヒット(規範のキー要素が記載されている)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add evergreen-wiki/references/conventions.md
@@ -138,7 +138,7 @@ git commit -m "feat: evergreen-wiki の書式規約(conventions.md)を追加"
   - `bundle-locate.sh [--scope user|project|all] [--root <dir>]`: 発見した bundle を `<scope>\t<絶対パス>` で1行ずつ出力。見つからなくても exit 0
   - `selftest.sh`: fixture 生成ヘルパー `make_bundle <dir>`(正常系 bundle を作る)と `assert_contains / assert_not_contains / assert_exit` を持ち、失敗があれば exit 1
 
-- [ ] **Step 1: selftest.sh の骨格と bundle-locate 用アサーションを書く(失敗するテスト)**
+- [x] **Step 1: selftest.sh の骨格と bundle-locate 用アサーションを書く(失敗するテスト)**
 
 ```bash
 #!/usr/bin/env bash
@@ -246,12 +246,12 @@ echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
 ```
 
-- [ ] **Step 2: 失敗を確認する**
+- [x] **Step 2: 失敗を確認する**
 
 Run: `bash evergreen-wiki/scripts/selftest.sh`
 Expected: FAIL(bundle-locate.sh が存在しないため)
 
-- [ ] **Step 3: lib.sh と bundle-locate.sh を実装する**
+- [x] **Step 3: lib.sh と bundle-locate.sh を実装する**
 
 ```bash
 #!/usr/bin/env bash
@@ -310,12 +310,12 @@ exit 0
 
 Run: `chmod +x evergreen-wiki/scripts/*.sh`
 
-- [ ] **Step 4: テストが通ることを確認する**
+- [x] **Step 4: テストが通ることを確認する**
 
 Run: `bash evergreen-wiki/scripts/selftest.sh`
 Expected: `PASS=7 FAIL=0` で exit 0
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add evergreen-wiki/scripts/
@@ -334,7 +334,7 @@ git commit -m "feat: bundle-locate.sh と selftest 基盤を追加"
 - Consumes: `lib.sh` の `fm_get`、`bundle-locate.sh` の出力形式
 - Produces: `wiki-query.sh [--bundle <path>]... [--type t] [--tag t] [--keyword k] [--slug s]`。マッチしたページを `<bundle>\t<slug>\t<type>\t<status>\t<description>` で出力。`--bundle` 省略時は `bundle-locate.sh` の全 bundle を対象
 
-- [ ] **Step 1: selftest.sh に query のアサーションを追記する(失敗するテスト)**
+- [x] **Step 1: selftest.sh に query のアサーションを追記する(失敗するテスト)**
 
 `echo "PASS=$PASS FAIL=$FAIL"` の直前に挿入:
 
@@ -364,12 +364,12 @@ assert_contains "$out" "$B	pipe-exit-code"
 assert_contains "$out" "$WORK/kb2	pipe-exit-code"
 ```
 
-- [ ] **Step 2: 失敗を確認する**
+- [x] **Step 2: 失敗を確認する**
 
 Run: `bash evergreen-wiki/scripts/selftest.sh`
 Expected: query セクションで FAIL(wiki-query.sh が存在しない)
 
-- [ ] **Step 3: wiki-query.sh を実装する**
+- [x] **Step 3: wiki-query.sh を実装する**
 
 ```bash
 #!/usr/bin/env bash
@@ -409,12 +409,12 @@ done
 
 Run: `chmod +x evergreen-wiki/scripts/wiki-query.sh`
 
-- [ ] **Step 4: テストが通ることを確認する**
+- [x] **Step 4: テストが通ることを確認する**
 
 Run: `bash evergreen-wiki/scripts/selftest.sh`
 Expected: `FAIL=0` で exit 0
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add evergreen-wiki/scripts/
@@ -435,7 +435,7 @@ git commit -m "feat: wiki-query.sh を追加"
   - ERROR: `conformance-frontmatter`(frontmatter がない/閉じていない)、`conformance-type`(type 欠落・空)、`actor-format`(generated.by / verified[].by が actor 正規表現に不一致)
   - SUGGEST: `canonical-form`(トップレベルキーが正準順でない、または `verified:` が単一マッピング)、`stale`(stale_after < 現在時刻)、`verify-stale`(最新 verified.at < generated.at)
 
-- [ ] **Step 1: selftest.sh に lint 用の異常系 fixture とアサーションを追記する(失敗するテスト)**
+- [x] **Step 1: selftest.sh に lint 用の異常系 fixture とアサーションを追記する(失敗するテスト)**
 
 `echo "PASS=$PASS FAIL=$FAIL"` の直前に挿入:
 
@@ -491,12 +491,12 @@ assert_not_contains "$out" "actor-format"
 assert_not_contains "$out" "canonical-form"
 ```
 
-- [ ] **Step 2: 失敗を確認する**
+- [x] **Step 2: 失敗を確認する**
 
 Run: `bash evergreen-wiki/scripts/selftest.sh`
 Expected: lint セクションで FAIL(wiki-lint.sh が存在しない)
 
-- [ ] **Step 3: wiki-lint.sh を実装する(単一ファイル検査)**
+- [x] **Step 3: wiki-lint.sh を実装する(単一ファイル検査)**
 
 ```bash
 #!/usr/bin/env bash
@@ -596,12 +596,12 @@ Run: `chmod +x evergreen-wiki/scripts/wiki-lint.sh`
 
 **実装上の注意:** `check_note_file` 内の actor 検査は `while read` がサブシェルになると `ERRORS` が加算されない。実装時は process substitution(`while read ... done < <(...)`)を使うこと。上記コードのこの箇所は実装時に必ず直すこと(selftest の exit code アサーションが検出する)。
 
-- [ ] **Step 4: テストが通ることを確認する**
+- [x] **Step 4: テストが通ることを確認する**
 
 Run: `bash evergreen-wiki/scripts/selftest.sh`
 Expected: `FAIL=0` で exit 0(exit code アサーション含む)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add evergreen-wiki/scripts/
@@ -622,7 +622,7 @@ git commit -m "feat: wiki-lint.sh の単一ファイル検査を追加"
   - ERROR: `broken-link`(リンク先の notes ファイルが存在しない)、`index-miss`(note が index.md に未記載)、`index-format`(index.md の frontmatter が okf_version 以外を含む/エントリ行が書式不一致)、`log-format`(log.md の日付見出しが `## YYYY-MM-DD` 形式でない、または降順でない)、`one-way-link`(A→B のリンクに B→A がない)、`orphan`(他の note からの被リンクが1本もない note。concept/entity は対象外)
   - SUGGEST: `concept-candidate`(同一タグを5件以上の非 concept ページが持ち、そのタグを持つ concept ページが存在しない)
 
-- [ ] **Step 1: selftest.sh に横断検査のアサーションを追記する(失敗するテスト)**
+- [x] **Step 1: selftest.sh に横断検査のアサーションを追記する(失敗するテスト)**
 
 `echo "PASS=$PASS FAIL=$FAIL"` の直前に挿入:
 
@@ -697,12 +697,12 @@ assert_contains "$out" '"check":"broken-link"'
 
 **注意:** `one-way-link` のアサーションが fixture で成立するよう、`orphan-note.md` の `## 関連` に `* [パイプは exit code を隠す](/notes/pipe-exit-code.md)` を1行追加すること(pipe-exit-code 側は orphan-note にリンクしていない → 片方向)。上の heredoc に追記して使う。
 
-- [ ] **Step 2: 失敗を確認する**
+- [x] **Step 2: 失敗を確認する**
 
 Run: `bash evergreen-wiki/scripts/selftest.sh`
 Expected: cross-file セクションで FAIL
 
-- [ ] **Step 3: wiki-lint.sh に横断検査を追加実装する**
+- [x] **Step 3: wiki-lint.sh に横断検査を追加実装する**
 
 `check_note_file` ループの後、`[ "$ERRORS" -gt 0 ]` の前に bundle ごとの横断検査を追加:
 
@@ -786,17 +786,17 @@ done
 
 **実装上の注意(Task 4 と同じ罠):** `while read` のサブシェル内で `report ERROR` しても `ERRORS` が親に伝わらない。横断検査ではパイプではなく一時ファイルまたは process substitution でループすること。selftest の `assert_exit rc 1` が検出する。
 
-- [ ] **Step 4: テストが通ることを確認する**
+- [x] **Step 4: テストが通ることを確認する**
 
 Run: `bash evergreen-wiki/scripts/selftest.sh`
 Expected: `FAIL=0` で exit 0
 
-- [ ] **Step 5: shellcheck(あれば)を通す**
+- [x] **Step 5: shellcheck(あれば)を通す**
 
 Run: `command -v shellcheck >/dev/null && shellcheck evergreen-wiki/scripts/*.sh || echo "shellcheck なし: スキップ"`
 Expected: エラーなし(warning は SC2086 等、意図的なものは directive で抑制)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add evergreen-wiki/scripts/
@@ -814,7 +814,7 @@ git commit -m "feat: wiki-lint.sh の bundle 横断検査を追加"
 - Consumes: conventions.md の規約、Task 2-5 のスクリプト CLI
 - Produces: Init / Ingest / Query / Lint の実行手順書。SKILL.md(Task 7)から参照される
 
-- [ ] **Step 1: operations.md を書く**
+- [x] **Step 1: operations.md を書く**
 
 以下の章立てで日本語で記述する(設計書 §5 を過不足なく落とし込む。スクリプト名・CLI・出力形式は Task 2-5 の実装と一致させる):
 
@@ -860,7 +860,7 @@ git commit -m "feat: wiki-lint.sh の bundle 横断検査を追加"
  4. log.md に記録)
 ```
 
-- [ ] **Step 2: 記載内容とスクリプト実装の一致を確認する**
+- [x] **Step 2: 記載内容とスクリプト実装の一致を確認する**
 
 Run: `grep -o 'bundle-locate.sh\|wiki-query.sh\|wiki-lint.sh' evergreen-wiki/references/operations.md | sort -u`
 Expected: 3スクリプトすべてが登場
@@ -868,7 +868,7 @@ Expected: 3スクリプトすべてが登場
 Run: `grep -c 'conformance-frontmatter\|broken-link\|concept-candidate' evergreen-wiki/references/operations.md`
 Expected: 1以上(check id 一覧が記載されている)
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add evergreen-wiki/references/operations.md
@@ -885,7 +885,7 @@ git commit -m "feat: evergreen-wiki の操作手順(operations.md)を追加"
 **Interfaces:**
 - Consumes: references/ の2文書、scripts/ の3スクリプト + selftest
 
-- [ ] **Step 1: SKILL.md を書く**
+- [x] **Step 1: SKILL.md を書く**
 
 frontmatter(name / description)+ 本文。description は明示呼び出しのトリガー条件を具体的な発話例で列挙する(自律トリガーは持たない旨を含める):
 
@@ -912,12 +912,12 @@ description: >-
  参照ファイル一覧(conventions.md は「ページを作る/更新する前に必ず読む」と明記))
 ```
 
-- [ ] **Step 2: 統合検証 — selftest 全体を実行する**
+- [x] **Step 2: 統合検証 — selftest 全体を実行する**
 
 Run: `bash evergreen-wiki/scripts/selftest.sh`
 Expected: `FAIL=0` で exit 0
 
-- [ ] **Step 3: 統合検証 — 実際の Init 相当の scaffold を一時ディレクトリで作り、lint が無違反であることを確認する**
+- [x] **Step 3: 統合検証 — 実際の Init 相当の scaffold を一時ディレクトリで作り、lint が無違反であることを確認する**
 
 Run:
 ```bash
@@ -930,7 +930,7 @@ rm -rf "$T"
 ```
 Expected: 出力なし・`exit=0`(空 bundle は無違反)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add evergreen-wiki/SKILL.md

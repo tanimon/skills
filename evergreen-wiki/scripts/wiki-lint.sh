@@ -17,13 +17,21 @@ if [ ${#BUNDLES[@]} -eq 0 ]; then exit 0; fi
 ERRORS=0
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 ACTOR_RE='^(human:.+|process:.+|[^/ ]+/[^/ ]+)$'
+SLUG_RE='^[a-z0-9][a-z0-9-]*$'
 CANON_ORDER="type title description tags sources generated verified status stale_after"
+# links_file: "from>to" の行集合(bundle ごとに truncate して使い回す)。中断時も EXIT trap で掃除する
+LINKS_FILE=$(mktemp)
+trap 'rm -f "$LINKS_FILE"' EXIT
+
+# JSON 文字列エスケープ(detail にはファイル由来の値が入るため \ と " を必ずエスケープする。
+# 制御文字はエスケープ対象外: タブ・改行は report の引数に混入しない運用前提)
+json_esc() { local s=${1//\\/\\\\}; s=${s//\"/\\\"}; printf '%s' "$s"; }
 
 report() { # severity check bundle file detail
   [ "$1" = ERROR ] && ERRORS=$((ERRORS+1))
   if [ "$JSON" = 1 ]; then
-    # detail に二重引用符・バックスラッシュは含めない前提(自前生成の文字列のみ)
-    printf '{"severity":"%s","check":"%s","bundle":"%s","file":"%s","detail":"%s"}\n' "$1" "$2" "$3" "$4" "$5"
+    printf '{"severity":"%s","check":"%s","bundle":"%s","file":"%s","detail":"%s"}\n' \
+      "$(json_esc "$1")" "$(json_esc "$2")" "$(json_esc "$3")" "$(json_esc "$4")" "$(json_esc "$5")"
   else
     printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5"
   fi
@@ -48,8 +56,16 @@ canonical_order_ok() {
   return 0
 }
 
+# fm_next_line <file> <key>: frontmatter 内でトップレベルキー行(<key>:)の直後の1行を出力。
+# fm_block | grep -q のパイプは grep の早期 exit → SIGPIPE → pipefail で条件が反転しうるため、
+# 単一 awk で捕捉してから呼び出し側が判定する
+fm_next_line() {
+  awk -v k="$2" '/^---$/{n++; next} n>=2{exit} n!=1{next} p{print; exit} $0==k":"{p=1}' "$1"
+}
+
 check_note_file() { # bundle file
-  local b="$1" f="$2" rel="notes/$(basename "$2")"
+  local b="$1" f="$2" rel
+  rel="notes/$(basename "$2")"
   if ! has_frontmatter "$f"; then
     report ERROR conformance-frontmatter "$b" "$rel" "frontmatter がないか閉じていない"
     return
@@ -63,40 +79,60 @@ check_note_file() { # bundle file
   done < <(fm_block "$f" | awk '/^(generated|verified):/{on=1; next} /^[a-zA-Z_]+:/{on=0} on && /^[ -]*by:/' | sed 's/^[ -]*by:[ ]*//')
   # 正準形: キー順序
   canonical_order_ok "$f" || report SUGGEST canonical-form "$b" "$rel" "frontmatter キーが正準順でない"
-  # 正準形: verified が単一マッピング(直後の行が "  by:" ならリストでない)
-  if fm_block "$f" | grep -q '^verified:$'; then
-    fm_block "$f" | awk '/^verified:$/{getline; print; exit}' | grep -q '^  by:' &&
-      report SUGGEST canonical-form "$b" "$rel" "verified が単一マッピング(1要素リストに正規化を推奨)"
-  fi
-  # Lifecycle: stale_after 超過(ISO 8601 UTC は文字列比較で成立)
+  # 正準形: verified / sources が単一マッピング(キー行の直後がブロックリストの "  - " でなく "  key:" ならリストでない)
+  local vnext snext
+  vnext=$(fm_next_line "$f" verified)
+  case "$vnext" in "  by:"*)
+    report SUGGEST canonical-form "$b" "$rel" "verified が単一マッピング(1要素リストに正規化を推奨)" ;;
+  esac
+  snext=$(fm_next_line "$f" sources)
+  case "$snext" in "  resource:"*)
+    report SUGGEST canonical-form "$b" "$rel" "sources が単一マッピング(1要素リストに正規化を推奨)" ;;
+  esac
+  # Lifecycle: stale_after 超過(ISO 8601 UTC は文字列比較で成立。fm_get が引用符を剥がすので
+  # 引用符付き timestamp でも誤判定しない)
   local sa; sa=$(fm_get "$f" stale_after)
   if [ -n "$sa" ] && [ "$sa" \< "$NOW" ]; then
     report SUGGEST stale "$b" "$rel" "stale_after 超過: $sa"
   fi
-  # Trust: 最新 verified.at < generated.at なら検証失効
+  # Trust: 最新 verified.at < generated.at なら検証失効(値の引用符は剥がして比較する)
   local gat vat
-  gat=$(fm_block "$f" | awk '/^generated:$/{on=1; next} /^[a-zA-Z_]+:/{on=0} on && /^  at:/{sub(/^  at:[ ]*/, ""); print}' | head -n1)
-  vat=$(fm_block "$f" | awk '/^verified:$/{on=1; next} /^[a-zA-Z_]+:/{on=0} on && /at:/{sub(/^.*at:[ ]*/, ""); print}' | sort | tail -n1)
+  gat=$(awk '/^---$/{n++; next} n>=2{exit} n!=1{next}
+             /^generated:$/{on=1; next} /^[a-zA-Z_]+:/{on=0}
+             on && /^  at:/{sub(/^  at:[ ]*/, ""); gsub(/["'\'']/, ""); print; exit}' "$f")
+  vat=$(awk '/^---$/{n++; next} n>=2{exit} n!=1{next}
+             /^verified:$/{on=1; next} /^[a-zA-Z_]+:/{on=0}
+             on && /at:/{sub(/^.*at:[ ]*/, ""); gsub(/["'\'']/, ""); print}' "$f" | sort | tail -n1)
   if [ -n "$gat" ] && [ -n "$vat" ] && [ "$vat" \< "$gat" ]; then
     report SUGGEST verify-stale "$b" "$rel" "最新の検証($vat)が generated($gat)より古い(再検証候補)"
   fi
 }
 
 check_bundle_cross() { # bundle
-  local b="$1" f slug to t
+  local b="$1" f slug to t bad_link tag_hit
   # 予約ファイル構造検査: index.md / log.md が無ければ ERROR を出し、
   # 以降の当該ファイルに依存する横断検査(index-miss/index-format/log-format)はスキップする
   local has_index=1 has_log=1
   [ -f "$b/index.md" ] || { report ERROR conformance-structure "$b" "index.md" "予約ファイルが存在しない"; has_index=0; }
   [ -f "$b/log.md" ]   || { report ERROR conformance-structure "$b" "log.md" "予約ファイルが存在しない"; has_log=0; }
-  local links_file; links_file=$(mktemp)
-  # links_file: "from>to" の行集合(存在しないリンク先も含む。broken-link 判定と併用)
+  : > "$LINKS_FILE"
   for f in "$b"/notes/*.md; do
     [ -e "$f" ] || continue
     slug=$(basename "$f" .md)
+    # slug-format: 命名規則違反のファイルは正規リンク記法で参照できないため、
+    # 真因をこの1件で報告し、以降の相互リンク検査(誤検出の連鎖源)からは除外する
+    if ! echo "$slug" | grep -Eq "$SLUG_RE"; then
+      report ERROR slug-format "$b" "notes/$slug.md" "ファイル名が slug 規則(^[a-z0-9][a-z0-9-]*\$)に違反"
+      continue
+    fi
+    # link-format: /notes/ へのリンクのうち正規形式(空 slug・規則外 slug 等)でないもの
+    bad_link=$(grep -o '](/notes/[^)]*)' "$f" | grep -Ev '^\]\(/notes/[a-z0-9][a-z0-9-]*\.md\)$' || true)
+    [ -n "$bad_link" ] &&
+      report ERROR link-format "$b" "notes/$slug.md" "リンクが正規形式([label](/notes/<slug>.md))でない"
     # shellcheck disable=SC2013 # 行ではなく個々のリンク先(単語)を反復する意図的な word-split。slug は [a-z0-9-] のみで空白を含まない
-    for to in $(grep -o '](/notes/[a-z0-9-]*\.md)' "$f" | sed 's|](/notes/||; s|\.md)||'); do
-      printf '%s>%s\n' "$slug" "$to" >> "$links_file"
+    for to in $(grep -o '](/notes/[a-z0-9][a-z0-9-]*\.md)' "$f" | sed 's|](/notes/||; s|\.md)||'); do
+      [ "$to" = "$slug" ] && continue   # 自己リンクは相互リンク網(orphan/one-way-link)に数えない
+      printf '%s>%s\n' "$slug" "$to" >> "$LINKS_FILE"
       [ -f "$b/notes/$to.md" ] || report ERROR broken-link "$b" "notes/$slug.md" "リンク先が存在しない: /notes/${to}.md"
     done
     if [ "$has_index" = 1 ]; then
@@ -107,19 +143,19 @@ check_bundle_cross() { # bundle
   for f in "$b"/notes/*.md; do
     [ -e "$f" ] || continue
     slug=$(basename "$f" .md)
+    echo "$slug" | grep -Eq "$SLUG_RE" || continue   # slug-format 違反は報告済み
     while read -r to; do
       [ -n "$to" ] || continue
       [ -f "$b/notes/$to.md" ] || continue
-      grep -qx "$to>$slug" "$links_file" ||
+      grep -qx "$to>$slug" "$LINKS_FILE" ||
         report ERROR one-way-link "$b" "notes/$slug.md" "→ ${to} への片方向リンク(${to} 側に逆リンクなし)"
-    done < <(grep "^$slug>" "$links_file" 2>/dev/null | sed "s/^$slug>//")
+    done < <(grep "^$slug>" "$LINKS_FILE" 2>/dev/null | sed "s/^$slug>//")
     t=$(fm_get "$f" type)
     if [ "$t" = "note" ]; then
-      grep -q ">$slug\$" "$links_file" ||
+      grep -q ">$slug\$" "$LINKS_FILE" ||
         report ERROR orphan "$b" "notes/$slug.md" "他の note からの被リンクなし"
     fi
   done
-  rm -f "$links_file"
   if [ "$has_index" = 1 ]; then
     # index-format: frontmatter は okf_version のみ / エントリ行の書式
     # pipefail 下で「パイプ全体の終了ステータス」を条件に使うと、上流 grep が SIGPIPE で
@@ -129,9 +165,10 @@ check_bundle_cross() { # bundle
     bad_fm=$(fm_block "$b/index.md" | grep -Ev '^okf_version:')
     [ -n "$bad_fm" ] &&
       report ERROR index-format "$b" "index.md" "frontmatter に okf_version 以外のキーがある"
-    bad_entry=$(grep -E '^\* ' "$b/index.md" | grep -Ev '^\* \[[^]]+\]\(/notes/[a-z0-9-]+\.md\) - .+')
+    # 候補は - 箇条書きも含めて拾う(- で書かれた index を無検査で素通りさせない)
+    bad_entry=$(grep -E '^[*-] ' "$b/index.md" | grep -Ev '^\* \[[^]]+\]\(/notes/[a-z0-9][a-z0-9-]*\.md\) - .+')
     [ -n "$bad_entry" ] &&
-      report ERROR index-format "$b" "index.md" "エントリ行が「* [title](/notes/slug.md) - description」形式でない"
+      report ERROR index-format "$b" "index.md" "エントリ行が「* [title](/notes/slug.md) - description」形式でない(箇条書き記号は * のみ)"
   fi
   if [ "$has_log" = 1 ]; then
     # log-format: 日付見出しの形式と降順(同様にコマンド置換で捕捉してから判定)
@@ -156,7 +193,9 @@ check_bundle_cross() { # bundle
     for f in "$b"/notes/*.md; do
       [ -e "$f" ] || continue
       [ "$(fm_get "$f" type)" = "concept" ] || continue
-      fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -qx "$tag" && { has_concept=1; break; }
+      # grep -q の早期 exit による SIGPIPE + pipefail の偽陰性を避けるため全量捕捉してから判定
+      tag_hit=$(fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -x -- "$tag" || true)
+      [ -n "$tag_hit" ] && { has_concept=1; break; }
     done
     [ "$has_concept" = 0 ] && report SUGGEST concept-candidate "$b" "-" "タグ ${tag} を5件以上が共有(concept ページ候補)"
   done

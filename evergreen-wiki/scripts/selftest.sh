@@ -18,11 +18,11 @@ make_bundle() {
 ---
 okf_version: "0.2"
 ---
-# Concepts
+# concept
 
-# Entities
+# entity
 
-# Notes
+# note
 * [パイプは exit code を隠す](/notes/pipe-exit-code.md) - パイプ末尾の exit code だけが返る
 * [set -o pipefail の使いどころ](/notes/pipefail-usage.md) - パイプ中間の失敗を検出する
 EOF
@@ -30,7 +30,8 @@ EOF
 # Update Log
 
 ## 2026-08-25
-* 新規: pipe-exit-code, pipefail-usage
+
+- 新規: pipe-exit-code, pipefail-usage
 EOF
   cat > "$d/notes/pipe-exit-code.md" <<'EOF'
 ---
@@ -49,7 +50,8 @@ generated:
 本文。
 
 ## 関連
-* [set -o pipefail の使いどころ](/notes/pipefail-usage.md)
+
+- [set -o pipefail の使いどころ](/notes/pipefail-usage.md)
 EOF
   cat > "$d/notes/pipefail-usage.md" <<'EOF'
 ---
@@ -71,7 +73,8 @@ verified:
 本文。
 
 ## 関連
-* [パイプは exit code を隠す](/notes/pipe-exit-code.md)
+
+- [パイプは exit code を隠す](/notes/pipe-exit-code.md)
 EOF
 }
 
@@ -129,6 +132,23 @@ assert_contains "$out" "$WORK/kb2	pipe-exit-code"
 out=$(cd "$WORK/proj2" && EVERGREEN_USER_BUNDLE="$WORK/nonexistent" "$Q" --keyword anything); rc=$?
 assert_exit "$rc" 0 "bundle なしの query は exit 0"
 assert_not_contains "$out" "pipe-exit-code"
+# SIGPIPE 回帰(M1): 巨大かつ閉じていない frontmatter の note が混在しても query は
+# rc=141・出力ゼロで黙って死なず、同 bundle の正常な note も出力する
+BIGKB="$WORK/bigkb"; make_bundle "$BIGKB"
+{ printf -- '---\ntype: note\ntitle: big unclosed\n'
+  i=0; while [ "$i" -lt 4000 ]; do printf 'x%04d: filler-value-line-for-sigpipe-regression\n' "$i"; i=$((i+1)); done
+} > "$BIGKB/notes/unclosed-fm.md"
+out=$("$Q" --bundle "$BIGKB" --type note); rc=$?
+assert_exit "$rc" 0 "巨大・未閉鎖 frontmatter が混在しても query は exit 0"
+assert_contains "$out" "pipe-exit-code"
+# SIGPIPE 回帰(M1 派生): tags が巨大でも --tag は先頭タグを取りこぼさない
+{ printf -- '---\ntype: note\ntitle: many tags\ndescription: tags 大量\ntags: ['
+  i=0; while [ "$i" -lt 8000 ]; do printf 'tag-%04d, ' "$i"; i=$((i+1)); done
+  printf 'tag-last]\n---\n# many tags\n'
+} > "$BIGKB/notes/many-tags.md"
+out=$("$Q" --bundle "$BIGKB" --tag tag-0000); rc=$?
+assert_exit "$rc" 0 "巨大 tags でも --tag は exit 0"
+assert_contains "$out" "many-tags"
 
 echo "=== wiki-lint (single-file checks) ==="
 L="$SCRIPT_DIR/wiki-lint.sh"
@@ -163,7 +183,8 @@ stale_after: 2020-01-01T00:00:00Z
 # 不正 actor
 
 ## 関連
-* [パイプは exit code を隠す](/notes/pipe-exit-code.md)
+
+- [パイプは exit code を隠す](/notes/pipe-exit-code.md)
 EOF
 out=$("$L" --bundle "$BAD"); rc=$?
 assert_exit "$rc" 1 "ERROR があれば exit 1"
@@ -196,18 +217,21 @@ generated:
 # 孤立ノート
 
 ## 関連
-* [存在しないページ](/notes/no-such-page.md)
-* [パイプは exit code を隠す](/notes/pipe-exit-code.md)
+
+- [存在しないページ](/notes/no-such-page.md)
+- [パイプは exit code を隠す](/notes/pipe-exit-code.md)
 EOF
 # log.md を不正な形式に(日付見出しが昇順)
 cat > "$XB/log.md" <<'EOF'
 # Update Log
 
 ## 2026-08-24
-* 古いエントリ
+
+- 古いエントリ
 
 ## 2026-08-25
-* 新しいエントリ
+
+- 新しいエントリ
 EOF
 out=$("$L" --bundle "$XB"); rc=$?
 assert_exit "$rc" 1 "横断検査の ERROR で exit 1"
@@ -273,6 +297,119 @@ NOFILE="$WORK/nofilekb"; mkdir -p "$NOFILE/notes"
 out=$("$L" --bundle "$NOFILE"); rc=$?
 assert_exit "$rc" 1 "予約ファイル不存在で exit 1"
 assert_contains "$out" "ERROR	conformance-structure"
+
+echo "=== wiki-lint (review regressions) ==="
+# M2: 引用符付き stale_after(未来)は stale と報告しない(引用符は全数字より小さく、
+# 剥がさないと文字列比較で永久に stale になる)
+QK="$WORK/quotedkb"; make_bundle "$QK"
+cat > "$QK/notes/quoted-stale.md" <<'EOF'
+---
+type: note
+title: quoted stale
+description: 引用符付き stale_after
+tags: [misc]
+status: stable
+stale_after: "2099-01-01T00:00:00Z"
+---
+# quoted stale
+EOF
+out=$("$L" --bundle "$QK" 2>/dev/null) || true
+assert_not_contains "$out" "SUGGEST	stale"
+# M3: slug 規則外のファイルは slug-format ERROR 1件で報告し、相互リンク検査の誤検出連鎖
+# (orphan / one-way-link)を起こさない
+SK="$WORK/slugkb"; make_bundle "$SK"
+cat > "$SK/notes/Foo_Bar.md" <<'EOF'
+---
+type: note
+title: bad slug
+description: slug 規則外
+tags: [misc]
+---
+# bad slug
+
+## 関連
+
+- [パイプは exit code を隠す](/notes/pipe-exit-code.md)
+EOF
+# link-format: 空 slug へのリンクは正規形式違反として検出する
+cat > "$SK/notes/bad-link-note.md" <<'EOF'
+---
+type: note
+title: bad link
+description: 空 slug リンク
+tags: [misc]
+---
+# bad link
+
+## 関連
+
+- [x](/notes/.md)
+EOF
+out=$("$L" --bundle "$SK" 2>/dev/null) || true
+assert_contains "$out" "ERROR	slug-format	$SK	notes/Foo_Bar.md"
+assert_not_contains "$out" "one-way-link	$SK	notes/Foo_Bar.md"
+assert_not_contains "$out" "orphan	$SK	notes/Foo_Bar.md"
+assert_contains "$out" "ERROR	link-format	$SK	notes/bad-link-note.md"
+# M4: --json は detail 内の " と \ をエスケープし、壊れた JSON を出さない
+JK="$WORK/jsonkb"; make_bundle "$JK"
+cat > "$JK/notes/json-escape.md" <<'EOF'
+---
+type: note
+title: json escape
+description: actor に引用符とバックスラッシュ
+tags: [misc]
+generated:
+  by: bad "quoted\actor
+  at: 2026-08-25T00:00:00Z
+---
+# json escape
+EOF
+out=$("$L" --bundle "$JK" --json 2>/dev/null) || true
+# 期待する生出力: ...bad \"quoted\\actor...(BRE では \\ = リテラル \)
+assert_contains "$out" 'bad \\"quoted\\\\actor'
+# M5: - 箇条書きの index.md も index-format 検査の対象になる(素通りしない)
+IF2="$WORK/if2kb"; make_bundle "$IF2"
+cat > "$IF2/index.md" <<'EOF'
+---
+okf_version: "0.2"
+---
+# note
+- [パイプは exit code を隠す](/notes/pipe-exit-code.md) - パイプ末尾の exit code だけが返る
+EOF
+out=$("$L" --bundle "$IF2" 2>/dev/null) || true
+assert_contains "$out" "ERROR	index-format"
+# L1: 自己リンクだけの note は orphan をすり抜けない
+SL="$WORK/selfkb"; make_bundle "$SL"
+cat > "$SL/notes/self-link.md" <<'EOF'
+---
+type: note
+title: self link
+description: 自己リンクのみ
+tags: [misc]
+---
+# self link
+
+## 関連
+
+- [self](/notes/self-link.md)
+EOF
+out=$("$L" --bundle "$SL" 2>/dev/null) || true
+assert_contains "$out" "ERROR	orphan	$SL	notes/self-link.md"
+# L3: sources の単一マッピングも canonical-form で検出する
+CS="$WORK/srckb"; make_bundle "$CS"
+cat > "$CS/notes/single-sources.md" <<'EOF'
+---
+type: note
+title: single sources
+description: sources が単一マッピング
+tags: [misc]
+sources:
+  resource: "https://example.com/x"
+---
+# single sources
+EOF
+out=$("$L" --bundle "$CS" 2>/dev/null) || true
+assert_contains "$out" "SUGGEST	canonical-form	$CS	notes/single-sources.md	sources が単一マッピング"
 
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
