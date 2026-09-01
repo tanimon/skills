@@ -2,7 +2,7 @@
 
 本書は evergreen-wiki skill が提供する4操作(Init / Ingest / Query / Lint)の実行手順を定める。書式・分類・マージ・相互リンクの規約は `references/conventions.md` を参照し、本書では重複して記載しない。
 
-以下のコマンド例における `scripts/*.sh` は、この skill のディレクトリ(`evergreen-wiki/`)からの相対パスで示す。実行時のカレントディレクトリはユーザーのプロジェクトであり skill ディレクトリとは限らないため、実際に実行する際は skill の絶対パス(例: `~/.claude/skills/evergreen-wiki/scripts/bundle-locate.sh`)に読み替える。
+以下のコマンド例における `scripts/*.sh` は、この skill のディレクトリ(`evergreen-wiki/`)からの相対パスで示す。実行時のカレントディレクトリはユーザーのプロジェクトであり skill ディレクトリとは限らないため、実際に実行する際は skill ディレクトリの絶対パス(本ファイルが置かれている `evergreen-wiki/` の実パス)起点に読み替える。
 
 ## 1. Init(bundle 作成)
 

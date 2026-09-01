@@ -93,7 +93,7 @@ check id 一覧と詳細手順は `references/operations.md` §4 を参照。
 | `scripts/wiki-lint.sh` | 機械チェック一式(OKF conformance 検証を含む)。`--json` 対応。出力: `<severity>\t<check>\t<bundle>\t<file>\t<detail>`。ERROR が1件でもあれば exit 1、SUGGEST のみ・検出なしなら exit 0 | `scripts/wiki-lint.sh --bundle ~/knowledge` |
 | `scripts/selftest.sh` | fixture bundle を一時ディレクトリに生成し、lint/query の挙動をアサートする回帰テスト。`PASS=N FAIL=0` を出力し FAIL=0 で exit 0 | `bash scripts/selftest.sh` |
 
-上記コマンド例は `evergreen-wiki/` からの相対パスで示す。実行時のカレントディレクトリは skill ディレクトリとは限らないため、実際には skill の絶対パス(例: `~/.claude/skills/evergreen-wiki/scripts/...`)に読み替える。
+上記コマンド例は `evergreen-wiki/` からの相対パスで示す。実行時のカレントディレクトリは skill ディレクトリとは限らないため、実際には skill ディレクトリの絶対パス(この SKILL.md が置かれている `evergreen-wiki/` の実パス)起点に読み替える。
 
 ## 参照ファイル
 

@@ -184,10 +184,10 @@ evergreen-wiki/
 
 ### 配置・運用
 
-- 本リポジトリに `evergreen-wiki/` として作成し、利用時は `~/.claude/skills/evergreen-wiki` への symlink を張る
+- 本リポジトリに `evergreen-wiki/` として作成し、プロジェクトローカルでのみ使う。`~/.claude/skills/` への symlink は張らない(下記の決定事項参照)
 - ドキュメント類(SKILL.md / references / 本設計書)はすべて日本語で記載する
 
-#### 未決事項: 既存 `llm-wiki` skill との併存(symlink 配備前に要決定)
+#### 決定事項: 既存 `llm-wiki` skill と競合するため symlink 配備しない
 
 `~/.claude/skills/` には別リポジトリ由来の `llm-wiki` skill が既にインストールされており、本 skill と次の点で競合する。
 
@@ -196,7 +196,7 @@ evergreen-wiki/
 - 発動ポリシーが正反対(llm-wiki は自律発動あり / 本 skill は明示呼び出しのみ)
 - bundle モデルが異なる(llm-wiki は単一統合 wiki / 本 skill は user + project の複数 bundle)
 
-この状態で symlink を張ると skill 選択が非決定的になるため、配備前に次のいずれかを決定する: (a) llm-wiki を置換(supersede)する、(b) トリガー語を棲み分けて併存させる、(c) 本 skill は symlink せずプロジェクトローカルで使う。
+この状態で symlink を張ると skill 選択が非決定的になるため、**本 skill は symlink せずプロジェクトローカルでのみ使う**と決定した(2026-09-01)。llm-wiki の置換やトリガー語の棲み分けによるグローバル配備は、必要になった時点で改めて検討する。
 
 ## 7. スコープ外(将来の拡張ポイント)
 
