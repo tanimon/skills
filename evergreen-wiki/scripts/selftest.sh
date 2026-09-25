@@ -581,5 +581,73 @@ assert_contains "$out" "SUGGEST	source-id-format	$FN	notes/bad-ids.md	sources �
 assert_contains "$out" "に違反: Bad_ID"
 assert_contains "$out" "ERROR	source-id-dup	$FN	notes/bad-ids.md	sources の id がページ内で重複: dup-key"
 
+echo "=== review round 4 regressions ==="
+# I1: 対の引用符で囲まれた actor は引用符を剥がしてから照合する(fm_get と同じ規則)。
+# 剥がした後も記法違反なら ERROR のまま
+QA="$WORK/quotedactorkb"; make_bundle "$QA"
+cat > "$QA/notes/quoted-actor.md" <<'EOF'
+---
+type: note
+title: quoted actor
+description: 引用符付き actor
+tags: [misc]
+generated:
+  by: "human:alice"
+  at: 2026-08-25T00:00:00Z
+verified:
+  - by: 'process:ci'
+    at: 2026-08-26T00:00:00Z
+---
+# quoted actor
+EOF
+cat > "$QA/notes/quoted-bad-actor.md" <<'EOF'
+---
+type: note
+title: quoted bad actor
+description: 引用符を剥がしても違反
+tags: [misc]
+generated:
+  by: "no actor"
+  at: 2026-08-25T00:00:00Z
+---
+# quoted bad actor
+EOF
+out=$("$L" --bundle "$QA" 2>/dev/null) || true
+assert_not_contains "$out" "actor-format	$QA	notes/quoted-actor.md"
+assert_contains "$out" "ERROR	actor-format	$QA	notes/quoted-bad-actor.md"
+# I2: インラインコード・fenced code 内のリンク例は link-format / broken-link / one-way-link の対象外。
+# コード外の実リンクは従来どおり検査される
+CL="$WORK/codelinkkb"; make_bundle "$CL"
+cat > "$CL/notes/code-links.md" <<'EOF'
+---
+type: note
+title: code links
+description: リンク記法の説明
+tags: [misc]
+---
+# code links
+
+リンクは `[label](/notes/<slug>.md)` の形式で書く。
+
+```markdown
+[x](/notes/nonexistent.md)
+[y](/notes/pipe-exit-code.md)
+```
+
+    [z](/notes/indented-nonexistent.md)
+
+実リンク: [壊れたリンク](/notes/real-missing.md)
+EOF
+out=$("$L" --bundle "$CL" 2>/dev/null) || true
+assert_not_contains "$out" "link-format	$CL	notes/code-links.md"
+assert_not_contains "$out" "/notes/nonexistent.md"
+assert_not_contains "$out" "/notes/indented-nonexistent.md"
+assert_not_contains "$out" "one-way-link	$CL	notes/code-links.md"
+assert_contains "$out" "ERROR	broken-link	$CL	notes/code-links.md	リンク先が存在しない: /notes/real-missing.md"
+# I4: bundle ディレクトリがプロジェクトルートから深さ3なら発見される(operations.md の記述と一致)
+make_bundle "$WORK/proj4/a/b/c"
+out=$(EVERGREEN_USER_BUNDLE="$WORK/nonexistent" "$SCRIPT_DIR/bundle-locate.sh" --root "$WORK/proj4")
+assert_contains "$out" "project	$WORK/proj4/a/b/c"
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

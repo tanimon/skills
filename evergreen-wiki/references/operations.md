@@ -13,7 +13,7 @@
 
 3. **見つからない場合のみ、場所を決定する**。
    - user scope: `~/knowledge/` に固定する(環境変数 `EVERGREEN_USER_BUNDLE` で上書きされている場合はその値)。場所の確認は不要。
-   - project scope: `git rev-parse --show-toplevel`(git 管理外の場合は CWD)配下の候補(`docs/knowledge/` 等)を提示し、AskUserQuestion ツールでユーザーに確認して決定する。`bundle-locate.sh` はプロジェクトルートから深さ4まで(`find -maxdepth 4`)しか探索しないため、これを超える深い場所を候補として選ぶと、以後の Query/Lint/Ingest がこの bundle を発見できなくなる。候補提示時は深さ4以内の場所に限定する。
+   - project scope: `git rev-parse --show-toplevel`(git 管理外の場合は CWD)配下の候補(`docs/knowledge/` 等)を提示し、AskUserQuestion ツールでユーザーに確認して決定する。`bundle-locate.sh` は `index.md` をプロジェクトルートから深さ4まで(`find -maxdepth 4`)しか探索しない。つまり発見できるのは bundle ディレクトリ自体が深さ3以内(例: `docs/knowledge/` は深さ2、`a/b/c/` は深さ3)のものだけで、これより深い場所を候補として選ぶと、以後の Query/Lint/Ingest がこの bundle を発見できなくなる。候補提示時は bundle ディレクトリが深さ3以内の場所に限定する。
 4. **scaffold を作成する**。bundle root に以下の3点を作成する。
 
    `index.md`:
@@ -111,7 +111,7 @@
    | `slug-format` | `notes/` 配下のファイル名が slug 規則(`^[a-z0-9][a-z0-9-]*$`、conventions.md §5)に違反 | ファイル名を slug 規則に沿って変更する。違反ページは正規リンク記法で参照できないため、相互リンク検査(`broken-link` / `one-way-link` / `orphan` / `index-miss`)の対象外になる |
    | `source-id-dup` | `sources[].id` が同一ページ内で重複している(脚注の結合キーが曖昧になり、無音の出典取り違えを招く) | 重複する要素の `id` を付け直す(本文の脚注ラベルも追随させる。conventions.md §3・§8) |
    | `footnote-ref` | 本文の脚注ラベル `[^<id>]` が同ページの `sources[].id` のいずれとも一致しない(fenced code block・インラインコード内は検査対象外) | `sources` に該当 id を持つ要素を追加するか、脚注ラベルを既存の id に合わせる(conventions.md §4・§6) |
-   | `link-format` | 本文中の `](/notes/...)` リンクが正規形式 `[label](/notes/<slug>.md)` でない(空 slug・規則外 slug 等) | conventions.md §6 のリンク記法に修正する |
+   | `link-format` | 本文中の `](/notes/...)` リンクが正規形式 `[label](/notes/<slug>.md)` でない(空 slug・規則外 slug 等。fenced code block・インデントコード・インラインコード内の記法の例示は検査対象外。`broken-link` / `one-way-link` / `orphan` も同様) | conventions.md §6 のリンク記法に修正する |
    | `broken-link` | 本文中の `[label](/notes/<slug>.md)` のリンク先が bundle 内に存在しない | リンク先ページを作成するか、リンクを削除・修正する |
    | `index-miss` | `notes/` 配下のページが `index.md` に記載されていない | `index.md` の該当 type セクションへ1行追加する |
    | `index-dangling` | `index.md` のエントリが存在しないページ(`/notes/<slug>.md`)を記載している(ページ統合・削除の取り残し) | エントリを削除するか、後継ページのエントリに差し替える |

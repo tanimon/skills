@@ -75,7 +75,9 @@ check_note_file() { # bundle file
   [ -n "$t" ] || report ERROR conformance-type "$b" "$rel" "type が欠落または空"
   # actor 記法: generated/verified ブロック配下の by: 行をすべて検査
   # process substitution を使い、report の ERRORS 加算がサブシェルで消えないようにする
+  # 値を対で囲む引用符は剥がしてから照合する(引用符付きの OKF 妥当な actor を ERROR にしない)
   while read -r actor; do
+    actor=$(unquote "$actor")
     echo "$actor" | grep -Eq "$ACTOR_RE" || report ERROR actor-format "$b" "$rel" "actor 記法違反: $actor"
   done < <(fm_block "$f" | awk '/^(generated|verified):/{on=1; next} /^[a-zA-Z_]+:/{on=0} on && /^[ -]*by:/' | sed 's/^[ -]*by:[ ]*//')
   # 正準形: キー順序
@@ -109,30 +111,19 @@ check_note_file() { # bundle file
     [ -n "$sid" ] || continue
     report ERROR source-id-dup "$b" "$rel" "sources の id がページ内で重複: $sid"
   done <<< "$dup"
-  # 本文(frontmatter 以降)の脚注ラベル(参照 [^id] と定義 [^id]: の双方)を全数捕捉してから照合する。
-  # fenced code block(``` / ~~~。フェンスは同種の記号でのみ閉じる: ``` 内の ~~~ 行は内容として
-  # 除外を継続する)・4スペース/タブのインデントコード行・インラインコードは除外する
-  # (正規表現の文字クラス [^...] を脚注と誤認しないため。インデント除外の代償として
-  # 4スペース以上インデントされたネストリスト内の脚注参照は拾えないが、ERROR の偽陽性より安い。
-  # フェンス長・info string の CommonMark 細則までは判定しない近似である)。
+  # 本文の脚注ラベル(参照 [^id] と定義 [^id]: の双方)を全数捕捉してから照合する。
+  # コード領域は body_prose(lib.sh)で除外する(正規表現の文字クラス [^...] を脚注と誤認しないため)。
   # ラベルの抽出は id と同じ slug 規則(先頭 [a-z0-9]、以降 [a-z0-9-])に限定する。
   # [^-abc] のような先頭ハイフンの文字クラスを拾わないための制約でもある。代償が2つ:
   # 非 slug な id を使う外部 bundle では footnote-ref が効かない(既知の偽陰性)、および
   # slug 文字種のみの文字クラス([^a-z] 等)を code で囲まず本文に書くと偽陽性 ERROR になる
   # (本文中の正規表現・コード断片はインラインコード必須。conventions.md §4)
-  # shellcheck disable=SC2016 # sed のバッククォートはインラインコード除去のリテラル。展開意図はない
   while read -r label; do
     [ -n "$label" ] || continue
     hit=$(printf '%s\n' "$sids" | grep -Fx -- "$label" || true)
     [ -n "$hit" ] ||
       report ERROR footnote-ref "$b" "$rel" "脚注ラベル [^${label}] に対応する sources の id がない"
-  done < <(awk '/^---$/{n++; next} n>=2' "$f" \
-             | awk '/^(```|~~~)/ { t = substr($0, 1, 1)
-                                   if (fence == "") fence = t
-                                   else if (fence == t) fence = ""
-                                   next }
-                    fence == "" && !/^(    |\t)/' \
-             | sed 's/`[^`]*`//g' | grep -o '\[\^[a-z0-9][a-z0-9-]*\]' | sed 's/^\[\^//; s/\]$//' | sort -u)
+  done < <(body_prose "$f" | grep -o '\[\^[a-z0-9][a-z0-9-]*\]' | sed 's/^\[\^//; s/\]$//' | sort -u)
   # Lifecycle: stale_after 超過(ISO 8601 UTC は文字列比較で成立。fm_get が引用符を剥がすので
   # 引用符付き timestamp でも誤判定しない)
   local sa; sa=$(fm_get "$f" stale_after)
@@ -155,7 +146,7 @@ check_note_file() { # bundle file
 }
 
 check_bundle_cross() { # bundle
-  local b="$1" f slug to t bad_link tag_hit
+  local b="$1" f slug to t bad_link tag_hit prose
   # 予約ファイル構造検査: index.md / log.md が無ければ ERROR を出し、
   # 以降の当該ファイルに依存する横断検査(index-miss/index-format/log-format)はスキップする
   local has_index=1 has_log=1
@@ -171,12 +162,15 @@ check_bundle_cross() { # bundle
       report ERROR slug-format "$b" "notes/$slug.md" "ファイル名が slug 規則(^[a-z0-9][a-z0-9-]*\$)に違反"
       continue
     fi
+    # リンク抽出はコード領域を除いた地の文から行う(記法を説明するページのコード内の例示を
+    # 実リンクと誤認し、link-format / broken-link / one-way-link を誤検出しないため)
+    prose=$(body_prose "$f")
     # link-format: /notes/ へのリンクのうち正規形式(空 slug・規則外 slug 等)でないもの
-    bad_link=$(grep -o '](/notes/[^)]*)' "$f" | grep -Ev '^\]\(/notes/[a-z0-9][a-z0-9-]*\.md\)$' || true)
+    bad_link=$(grep -o '](/notes/[^)]*)' <<< "$prose" | grep -Ev '^\]\(/notes/[a-z0-9][a-z0-9-]*\.md\)$' || true)
     [ -n "$bad_link" ] &&
       report ERROR link-format "$b" "notes/$slug.md" "リンクが正規形式([label](/notes/<slug>.md))でない"
     # shellcheck disable=SC2013 # 行ではなく個々のリンク先(単語)を反復する意図的な word-split。slug は [a-z0-9-] のみで空白を含まない
-    for to in $(grep -o '](/notes/[a-z0-9][a-z0-9-]*\.md)' "$f" | sed 's|](/notes/||; s|\.md)||'); do
+    for to in $(grep -o '](/notes/[a-z0-9][a-z0-9-]*\.md)' <<< "$prose" | sed 's|](/notes/||; s|\.md)||'); do
       [ "$to" = "$slug" ] && continue   # 自己リンクは相互リンク網(orphan/one-way-link)に数えない
       printf '%s>%s\n' "$slug" "$to" >> "$LINKS_FILE"
       [ -f "$b/notes/$to.md" ] || report ERROR broken-link "$b" "notes/$slug.md" "リンク先が存在しない: /notes/${to}.md"
