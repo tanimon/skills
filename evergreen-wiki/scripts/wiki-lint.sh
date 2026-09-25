@@ -240,14 +240,14 @@ check_bundle_cross() { # bundle
   for tag in $(for f in "$b"/notes/*.md; do
       [ -e "$f" ] || continue
       [ "$(fm_get "$f" type)" = "concept" ] && continue
-      fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//'
+      fm_tags "$f"
     done | grep -v '^$' | sort | uniq -c | awk '$1>=5{print $2}'); do
     has_concept=0
     for f in "$b"/notes/*.md; do
       [ -e "$f" ] || continue
       [ "$(fm_get "$f" type)" = "concept" ] || continue
       # grep -q の早期 exit による SIGPIPE + pipefail の偽陰性を避けるため全量捕捉してから判定
-      tag_hit=$(fm_get "$f" tags | tr -d '[]' | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -Fx -- "$tag" || true)
+      tag_hit=$(fm_tags "$f" | grep -Fx -- "$tag" || true)
       [ -n "$tag_hit" ] && { has_concept=1; break; }
     done
     [ "$has_concept" = 0 ] && report SUGGEST concept-candidate "$b" "-" "タグ ${tag} を5件以上が共有(concept ページ候補)"

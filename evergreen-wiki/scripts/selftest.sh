@@ -649,5 +649,46 @@ make_bundle "$WORK/proj4/a/b/c"
 out=$(EVERGREEN_USER_BUNDLE="$WORK/nonexistent" "$SCRIPT_DIR/bundle-locate.sh" --root "$WORK/proj4")
 assert_contains "$out" "project	$WORK/proj4/a/b/c"
 
+echo "=== review round 5 regressions ==="
+# R5-1: リスト項目内でインデントされたフェンス、および ``...`` のインラインコード内の文字クラスは
+# 脚注と誤認しない(footnote-ref の偽陽性 ERROR を出さない)。コード外の未定義脚注は従来どおり検出する
+R5="$WORK/r5kb"; make_bundle "$R5"
+cat > "$R5/notes/indented-fence.md" <<'EOF'
+---
+type: note
+title: indented fence
+description: リスト内フェンス
+tags: [misc]
+---
+# indented fence
+
+- 例
+  ```regex
+  [^a-z]
+  ```
+- 二重バッククォート: `` a`b [^x-y] `` の形
+
+未定義の脚注 [^missing]
+EOF
+out=$("$L" --bundle "$R5" 2>/dev/null) || true
+assert_not_contains "$out" '\[\^a-z\]'
+assert_not_contains "$out" '\[\^x-y\]'
+assert_contains "$out" "ERROR	footnote-ref	$R5	notes/indented-fence.md	脚注ラベル [^missing]"
+# R5-2: 引用符付きの tags 要素(["a", "b"])も --tag で照合できる
+R5Q="$WORK/r5qkb"; make_bundle "$R5Q"
+cat > "$R5Q/notes/quoted-tags.md" <<'EOF'
+---
+type: note
+title: quoted tags
+description: 引用符付きタグ
+tags: ["quoted-tag", 'single-tag']
+---
+# quoted tags
+EOF
+out=$("$Q" --bundle "$R5Q" --tag quoted-tag)
+assert_contains "$out" "	quoted-tags	"
+out=$("$Q" --bundle "$R5Q" --tag single-tag)
+assert_contains "$out" "	quoted-tags	"
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]
