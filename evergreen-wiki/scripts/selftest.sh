@@ -690,5 +690,107 @@ assert_contains "$out" "	quoted-tags	"
 out=$("$Q" --bundle "$R5Q" --tag single-tag)
 assert_contains "$out" "	quoted-tags	"
 
+echo "=== review round 6 regressions ==="
+# R6-M1: CRLF 改行のページ・index.md・log.md も正常に解釈する(query で黙って漏れない、lint は
+# 原因を line-ending SUGGEST で報告し、conformance-frontmatter / log-format の誤 ERROR を出さない)
+CR="$WORK/crlfkb"; make_bundle "$CR"
+for f in "$CR/notes/pipe-exit-code.md" "$CR/index.md" "$CR/log.md"; do
+  sed 's/$/'$'\r''/' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+done
+out=$("$Q" --bundle "$CR" --type note)
+assert_contains "$out" "	pipe-exit-code	note	stable	パイプ末尾の exit code だけが返る"
+out=$("$Q" --bundle "$CR" --tag error-handling)
+assert_contains "$out" "	pipe-exit-code	"
+out=$(EVERGREEN_USER_BUNDLE="$WORK/nonexistent" "$SCRIPT_DIR/bundle-locate.sh" --scope project --root "$CR")
+assert_contains "$out" "project	$CR"
+out=$("$L" --bundle "$CR" 2>/dev/null); rc=$?
+assert_exit "$rc" 0 "CRLF bundle は ERROR なし"
+assert_not_contains "$out" "ERROR"
+assert_contains "$out" "SUGGEST	line-ending	$CR	notes/pipe-exit-code.md"
+assert_contains "$out" "SUGGEST	line-ending	$CR	index.md"
+assert_contains "$out" "SUGGEST	line-ending	$CR	log.md"
+# R6-M2: --json は制御文字(タブ等)をエスケープし、全行が妥当な JSON になる。TSV でもフィールドがずれない
+JT="$WORK/jsontabkb"; make_bundle "$JT"
+printf -- '---\ntype: note\ntitle: tab actor\ndescription: タブ入り actor\ntags: [misc]\ngenerated:\n  by: bad\tb c\n  at: 2026-08-25T00:00:00Z\n---\n# tab actor\n' > "$JT/notes/tab-actor.md"
+out=$("$L" --bundle "$JT" --json 2>/dev/null) || true
+assert_contains "$out" 'actor 記法違反: bad\\tb c'
+if command -v python3 >/dev/null 2>&1; then
+  echo "$out" | python3 -c 'import json,sys; [json.loads(l) for l in sys.stdin if l.strip()]' 2>/dev/null && ok || ng "--json に不正な JSON 行がある"
+fi
+out=$("$L" --bundle "$JT" 2>/dev/null) || true
+nf=$(echo "$out" | grep 'actor-format' | awk -F'\t' '{print NF}')
+assert_exit "${nf:-0}" 5 "TSV の actor-format 行は5フィールド"
+# R6-L1: 同じページへの重複リンクは broken-link / one-way-link を1回だけ報告する
+DL="$WORK/duplinkkb"; make_bundle "$DL"
+cat >> "$DL/notes/pipe-exit-code.md" <<'EOF'
+- [dup1](/notes/solo.md) と [dup2](/notes/solo.md)
+- [miss1](/notes/gone.md) と [miss2](/notes/gone.md)
+EOF
+cat > "$DL/notes/solo.md" <<'EOF'
+---
+type: concept
+title: solo
+description: 逆リンクなし
+tags: [misc]
+---
+# solo
+EOF
+out=$("$L" --bundle "$DL" 2>/dev/null) || true
+assert_exit "$(echo "$out" | grep -c 'one-way-link.*→ solo ')" 1 "one-way-link は1回"
+assert_exit "$(echo "$out" | grep -c 'broken-link.*gone.md')" 1 "broken-link は1回"
+# R6-L2: okf_version が値なしのとき、bundle-locate は発見するので「発見できない」とは報告しない
+EV="$WORK/emptyverkb"; make_bundle "$EV"
+printf -- '---\nokf_version:\n---\n# note\n* [パイプは exit code を隠す](/notes/pipe-exit-code.md) - パイプ末尾の exit code だけが返る\n* [set -o pipefail の使いどころ](/notes/pipefail-usage.md) - パイプ中間の失敗を検出する\n' > "$EV/index.md"
+out=$("$L" --bundle "$EV" 2>/dev/null) || true
+assert_contains "$out" "ERROR	index-format	$EV	index.md	okf_version の値が空"
+assert_not_contains "$out" "発見できない"
+# R6-L3: 引用符なし値の YAML インラインコメントは剥がす(引用符内の # と空白なし # は値の一部)
+IC="$WORK/inlinecommentkb"; make_bundle "$IC"
+cat > "$IC/notes/commented.md" <<'EOF'
+---
+type: note # コメント
+title: "C# と F#" # 引用符後のコメント
+description: C#の話 # 末尾コメント
+tags: [misc] # タグのコメント
+generated:
+  by: human:alice # 生成者
+  at: 2026-08-25T00:00:00Z # 生成時刻
+---
+# commented
+EOF
+out=$("$Q" --bundle "$IC" --type note --slug commented)
+assert_contains "$out" "	commented	note	stable	C#の話"
+assert_not_contains "$out" "末尾コメント"
+out=$("$Q" --bundle "$IC" --tag misc --slug commented)
+assert_contains "$out" "	commented	"
+out=$("$L" --bundle "$IC" 2>/dev/null) || true
+assert_not_contains "$out" "actor-format	$IC	notes/commented.md"
+assert_not_contains "$out" "timestamp-format	$IC	notes/commented.md"
+# R6-L5: stale_after / at が ISO 8601 UTC 形式でなければ timestamp-format を出し、stale / verify-stale の
+# 文字列比較には使わない(stale_after: never を「期限内」と黙って判定しない)
+TF="$WORK/tsformatkb"; make_bundle "$TF"
+cat > "$TF/notes/bad-times.md" <<'EOF'
+---
+type: note
+title: bad times
+description: 形式違反の時刻
+tags: [misc]
+generated:
+  by: human:alice
+  at: 2026-09-01T00:00:00+09:00
+verified:
+  - by: human:bob
+    at: 2026-08-01T00:00:00Z
+stale_after: never
+---
+# bad times
+EOF
+out=$("$L" --bundle "$TF" 2>/dev/null) || true
+assert_contains "$out" "SUGGEST	timestamp-format	$TF	notes/bad-times.md	stale_after が ISO 8601 UTC"
+assert_contains "$out" "SUGGEST	timestamp-format	$TF	notes/bad-times.md	generated.at が ISO 8601 UTC"
+assert_not_contains "$out" "stale	$TF	notes/bad-times.md"
+assert_not_contains "$out" "verify-stale	$TF	notes/bad-times.md"
+assert_not_contains "$out" "timestamp-format	$TF	notes/pipefail-usage.md"
+
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

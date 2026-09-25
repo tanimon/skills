@@ -15,7 +15,8 @@ is_bundle() {
   [ -f "$1/index.md" ] || return 1
   # 単一 awk で判定する。awk | grep -q だと grep の早期 exit 後の書き込みが SIGPIPE になり、
   # pipefail 下で bundle が「発見されないまま exit 0」で終わる偽陰性を生むため
-  awk '/^---$/{n++; next} n>=2{exit} n==1 && /^okf_version:/{found=1; exit} END{exit !found}' "$1/index.md"
+  # CRLF の index.md も発見する(行末 CR を剥がしてから照合。lib.sh の改行方針と同じ)
+  awk '{ sub(/\r$/, "") } /^---$/{n++; next} n>=2{exit} n==1 && /^okf_version:/{found=1; exit} END{exit !found}' "$1/index.md"
 }
 abspath() { (cd "$1" 2>/dev/null && pwd); }
 

@@ -48,6 +48,8 @@ description: >-
 
 レジストリ・設定ファイルは持たない。bundle 自身(`okf_version` を持つ `index.md`)がマーカーとなるため、発見はどの環境でも決定論的に再現する。
 
+**当面の運用**: 既存の `llm-wiki` skill とトリガーが競合するため、この skill は `~/.claude/skills/` へ symlink せず、この skill を収めたリポジトリ内でのみ発動する(設計書 §6 の決定事項)。このリポジトリの外にある bundle(`~/knowledge/` や他プロジェクトの project bundle)は、このリポジトリからスクリプトに `--bundle <path>`(`bundle-locate.sh` は `--root <path>`)を明示して操作する。
+
 ## 4操作
 
 ### Init(bundle 作成)

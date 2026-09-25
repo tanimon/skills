@@ -117,7 +117,7 @@
    | `index-dangling` | `index.md` のエントリが存在しないページ(`/notes/<slug>.md`)を記載している(ページ統合・削除の取り残し) | エントリを削除するか、後継ページのエントリに差し替える |
    | `one-way-link` | A→B のリンクがあるのに B→A のリンクが無い(片方向リンク) | B 側のページに A への逆リンクを追加し双方向にする |
    | `orphan` | `type: note` のページが他のどのページからもリンクされていない(孤立ページ) | 関連する既存ページからリンクするか、`## 関連` に関連ページを追加する |
-   | `index-format` | `index.md` の frontmatter に `okf_version` 以外のキーがある、`okf_version` が無い(frontmatter ごと無い場合を含む。bundle マーカー喪失で `bundle-locate.sh` から発見されなくなる)、またはエントリ行(`* ` / `- ` 始まりの行)が `* [title](/notes/slug.md) - description` 形式でない(`- ` 箇条書きも違反として検出する) | conventions.md §7 の正準形式に修正する |
+   | `index-format` | `index.md` の frontmatter に `okf_version` 以外のキーがある、`okf_version` が無い(frontmatter ごと無い場合を含む。bundle マーカー喪失で `bundle-locate.sh` から発見されなくなる)、`okf_version` の値が空(キーがあるので発見はされるが OKF バージョンを判別できない)、またはエントリ行(`* ` / `- ` 始まりの行)が `* [title](/notes/slug.md) - description` 形式でない(`- ` 箇条書きも違反として検出する) | conventions.md §7 の正準形式に修正する |
    | `log-format` | `log.md` の日付見出しが `## YYYY-MM-DD` 形式でない、または新しい日付が上に来る降順で並んでいない | conventions.md §7 の正準形式に修正する |
 
    **SUGGEST(判断材料。exit code には影響しない)**
@@ -126,6 +126,8 @@
    |---|---|---|
    | `canonical-form` | frontmatter のキー順序が正準順(conventions.md §3)でない、または `verified` / `sources` が単一マッピングで書かれている(1要素でもリスト形式でない) | conventions.md §3 の正準形に正規化する。外部プロデューサー由来の非正準 YAML はエラーではなく正規化の提案として扱う(conventions.md §3「OKF 許容原則」) |
    | `source-id-format` | `sources[].id` が slug 規則(`^[a-z0-9][a-z0-9-]*$`)に違反(OKF 的には妥当な id もありうるため、正規化の提案として扱う。なお規則外の id は脚注結合検査 `footnote-ref` の対象にならない) | conventions.md §3 の id 規則に沿って付け直す(本文の脚注ラベルも追随させる) |
+   | `line-ending` | ファイル(`notes/*.md` / `index.md` / `log.md`)の改行が CRLF(CR を含む)。OKF 的には妥当なので、lint・query は LF と同じに解釈する | 改行を LF に正規化する(conventions.md §3「OKF 許容原則」) |
+   | `timestamp-format` | `stale_after` / `generated.at` / `verified.at` が ISO 8601 UTC(`YYYY-MM-DDTHH:MM:SSZ`)形式でない(`never`、`+09:00` 等のオフセット付き等)。形式外の値は文字列比較が成立しないため `stale` / `verify-stale` の判定対象から外す | conventions.md §3・§9 の ISO 8601 UTC 形式に書き直す |
    | `stale` | `stale_after` の期限を超過している | 内容を見直し、`stale_after` の更新、または `status: deprecated` への変更を検討する(conventions.md §9) |
    | `verify-stale` | 最新の `verified.at` が `generated.at` より古い(検証失効。マージで内容が変わったのに再検証されていない) | 内容を再確認し、`verified` に新しい検証イベントを追記する(既存の `verified` は削除しない) |
    | `concept-candidate` | 同一タグを `concept` 以外のページが5件以上共有しているが、そのタグを持つ `concept` ページが無い | 該当ページ群を束ねる `concept` ページの新設を検討する(conventions.md §5) |
